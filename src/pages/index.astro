@@ -1,0 +1,65 @@
+---
+import FilterPicker from '../components/FilterPicker.vue';
+import '../styles/global.css';
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LifeGuesser — A Field Guide Game</title>
+    <meta name="description" content="A geographical parlour game for the modern naturalist. Guess where in the world each specimen was observed." />
+  </head>
+  <body class="min-h-screen flex flex-col">
+    <!-- Masthead -->
+    <header class="px-8 pt-8">
+      <div class="hairline rise rise-1"></div>
+      <div class="flex items-baseline justify-between pt-3 text-[0.68rem] font-mono uppercase tracking-widest2 text-ink-soft rise rise-1">
+        <span>№ 001 &nbsp;·&nbsp; Field Guide Edition</span>
+        <span class="hidden sm:inline">Est. MMXXVI</span>
+        <span>Vol. I &nbsp;·&nbsp; Worldwide</span>
+      </div>
+    </header>
+
+    <main class="flex-1 px-8 pt-16 pb-12">
+      <div class="max-w-4xl mx-auto">
+        <!-- Title block -->
+        <div class="text-center mb-4 rise rise-2">
+          <div class="eyebrow mb-6">A Geographical Parlour Game</div>
+        </div>
+
+        <h1 class="font-display text-center leading-[0.85] rise rise-3">
+          <span class="block italic font-light text-[clamp(4rem,14vw,10rem)]" style="font-variation-settings: 'SOFT' 100, 'opsz' 144;">Life</span>
+          <span class="block font-semibold text-[clamp(3.5rem,12vw,8.5rem)] -mt-2 tracking-tight" style="font-variation-settings: 'opsz' 144;">Guesser</span>
+        </h1>
+
+        <div class="ornament max-w-md mx-auto mt-10 mb-6 rise rise-4">
+          <span class="font-display italic text-xl">✦</span>
+        </div>
+
+        <p class="font-serif italic text-center text-xl md:text-2xl text-ink-soft max-w-xl mx-auto leading-snug rise rise-4">
+          Observe the specimen. Consult your instincts.<br/>
+          Mark upon the map where Nature placed it.
+        </p>
+
+        <p class="font-mono text-[0.68rem] uppercase tracking-widest2 text-center text-ink-soft mt-6 rise rise-4">
+          Ludus&nbsp;Geographicus &nbsp;·&nbsp; var. naturalis
+        </p>
+
+        <!-- Filter picker -->
+        <div class="mt-20 rise rise-5">
+          <FilterPicker client:load />
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="px-8 pb-8 rise rise-6">
+      <div class="hairline"></div>
+      <div class="flex flex-wrap items-center justify-between gap-3 pt-4 text-[0.68rem] font-mono uppercase tracking-widest2 text-ink-soft">
+        <span>Specimens courtesy of <a class="link-ink" href="https://www.inaturalist.org" target="_blank" rel="noopener">iNaturalist</a></span>
+        <span class="hidden md:inline"><a href="/stats" class="link-ink">View Archive</a></span>
+        <span>Cartography: OpenStreetMap</span>
+      </div>
+    </footer>
+  </body>
+</html>

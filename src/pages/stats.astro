@@ -1,0 +1,44 @@
+---
+import StatsView from '../components/StatsView.vue';
+import '../styles/global.css';
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LifeGuesser — Field Notes Archive</title>
+    <meta name="description" content="A record of specimens observed and hypotheses ventured." />
+  </head>
+  <body class="min-h-screen flex flex-col">
+    <!-- Masthead -->
+    <header class="px-8 pt-8">
+      <div class="hairline rise rise-1"></div>
+      <div class="flex items-baseline justify-between pt-3 text-[0.68rem] font-mono uppercase tracking-widest2 text-ink-soft rise rise-1">
+        <span>№ 003 &nbsp;·&nbsp; Field Notes Archive</span>
+        <span class="hidden sm:inline">Est. MMXXVI</span>
+        <span>Vol. I &nbsp;·&nbsp; Worldwide</span>
+      </div>
+    </header>
+
+    <main class="flex-1 px-6 md:px-10 pt-10 pb-12">
+      <div class="max-w-5xl mx-auto">
+        <div class="text-center mb-10 rise rise-2">
+          <div class="eyebrow mb-4">№ 003 · Field Notes Archive</div>
+          <h1 class="font-display italic text-[clamp(3rem,10vw,7rem)] leading-none" style="font-variation-settings: 'opsz' 144;">Archive</h1>
+          <p class="font-serif italic text-ink-soft mt-4">A record of specimens observed and hypotheses ventured.</p>
+        </div>
+        <StatsView client:only="vue" />
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="px-8 pb-8 rise rise-6">
+      <div class="hairline"></div>
+      <div class="flex flex-wrap items-center justify-between gap-3 pt-4 text-[0.68rem] font-mono uppercase tracking-widest2 text-ink-soft">
+        <span><a class="link-ink" href="/">← Return to Index</a></span>
+        <span class="hidden md:inline">&mdash; Printed on the open web &mdash;</span>
+        <span>Specimens courtesy of <a class="link-ink" href="https://www.inaturalist.org" target="_blank" rel="noopener">iNaturalist</a></span>
+      </div>
+    </footer>
+  </body>
+</html>
