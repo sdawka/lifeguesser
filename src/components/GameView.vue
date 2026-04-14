@@ -17,6 +17,8 @@ import HintCategories from './HintCategories.vue';
 import OracleHint from './OracleHint.vue';
 import GuessMap from './GuessMap.vue';
 import ResultMap from './ResultMap.vue';
+import SubmitJournalModal from './SubmitJournalModal.vue';
+import type { SightingInput, SubmitJournalResponse } from '../lib/leaderboard-types';
 
 type State = 'loading' | 'guessing' | 'revealing' | 'gameover';
 
@@ -37,9 +39,28 @@ const lightboxOpen = ref(false);
 const lightboxUrl = ref('');
 const expeditionRounds = ref<GameRoundRecord[]>([]);
 const historySaved = ref(false);
+const showSubmitModal = ref(false);
+const journalSubmitted = ref(false);
+const submittedRank = ref<{ streak: number; totalScore: number } | null>(null);
 
 const filterHash = computed(() => hashFiltersSync(props.filters));
 const threshold = computed(() => thresholdForRound(roundIndex.value));
+
+const roundsForSubmit = computed((): SightingInput[] =>
+  expeditionRounds.value.map((r, i) => ({
+    roundIndex: i,
+    taxonId: null,
+    taxonName: r.taxonName,
+    distanceKm: r.distanceKm,
+    score: r.score,
+    hintsUsed: r.hintsUsed,
+    passed: r.passed,
+  }))
+);
+
+const totalScore = computed(() =>
+  expeditionRounds.value.reduce((sum, r) => sum + r.score, 0)
+);
 
 const guessMapRef = useTemplateRef<InstanceType<typeof GuessMap>>('guessMapRef');
 
@@ -136,11 +157,19 @@ function saveHistory() {
   historySaved.value = true;
 }
 
+function onJournalSubmitted(response: SubmitJournalResponse) {
+  journalSubmitted.value = true;
+  submittedRank.value = response.rank;
+}
+
 function playAgain() {
   streak.value = 0;
   roundIndex.value = 0;
   expeditionRounds.value = [];
   historySaved.value = false;
+  journalSubmitted.value = false;
+  submittedRank.value = null;
+  showSubmitModal.value = false;
   loadRound();
 }
 
@@ -333,6 +362,21 @@ function formatCoord(lat: number, lng: number) {
           </button>
           <template v-if="state === 'gameover'">
             <a href="/" class="btn-ghost">← Change Filters</a>
+            <button
+              v-if="!journalSubmitted"
+              type="button"
+              class="btn-ink"
+              @click="showSubmitModal = true"
+            >
+              Submit to Leaderboard
+            </button>
+            <a
+              v-if="journalSubmitted"
+              href="/leaderboard"
+              class="btn-ghost"
+            >
+              View Leaderboard
+            </a>
             <button type="button" class="btn-ink" @click="playAgain">
               New Expedition →
             </button>
@@ -349,6 +393,16 @@ function formatCoord(lat: number, lng: number) {
       :url="lightboxUrl"
       :caption="'Fig. ' + String(roundIndex + 1).padStart(2, '0')"
       @close="lightboxOpen = false"
+    />
+    <SubmitJournalModal
+      :open="showSubmitModal"
+      :streak="streak"
+      :total-score="totalScore"
+      :filter-hash="filterHash"
+      :filter-label="expeditionRounds.length > 0 ? `Expedition` : 'All · World'"
+      :rounds="roundsForSubmit"
+      @close="showSubmitModal = false"
+      @submitted="onJournalSubmitted"
     />
   </div>
 </template>
