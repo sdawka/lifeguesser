@@ -1,5 +1,6 @@
 ---
 import GameView from '../components/GameView.vue';
+import UserIdentityBar from '../components/UserIdentityBar.vue';
 import '../styles/global.css';
 
 const url = new URL(Astro.request.url);
@@ -31,7 +32,10 @@ const filters = {
         <span class="font-display italic text-base not-italic md:not-italic">
           <span class="italic font-light">Life</span><span class="font-semibold">Guesser</span>
         </span>
-        <span>Expedition in Progress</span>
+        <span class="flex items-center gap-3">
+          <UserIdentityBar client:only="vue" />
+          <span class="text-ink-soft">Expedition in Progress</span>
+        </span>
       </div>
     </header>
 
