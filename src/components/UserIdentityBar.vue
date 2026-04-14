@@ -1,7 +1,7 @@
 <!-- src/components/UserIdentityBar.vue -->
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { getUserId, getUserName, setUserId, setUserName, generateUserId } from '../lib/user-storage';
+import { getUserId, setUserName } from '../lib/user-storage';
 import type { User } from '../lib/leaderboard-types';
 
 const user = ref<User | null>(null);
