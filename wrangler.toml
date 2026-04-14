@@ -1,5 +1,4 @@
 name = "lifeguesser"
-account_id = "6f713a483248b6f86e97dc60bcac7d60"
 compatibility_date = "2024-09-01"
 pages_build_output_dir = "./dist"
 
@@ -13,5 +12,5 @@ id = "d316800fcf0d44adb448495e90f5c0e4"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "lifeguesser"
-database_id = "69a641ce-0063-46f5-9210-23dbca80d835"
+database_name = "lifeguesser-db"
+database_id = "05b767b8-d699-4059-bb15-4e412cdb9949"
