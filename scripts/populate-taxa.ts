@@ -3,15 +3,14 @@
  * Pre-populate taxon enrichment data for common species.
  *
  * Usage:
- *   TAVILY_API_KEY=tvly-xxx npx tsx scripts/populate-taxa.ts [--count 500] [--skip 0]
+ *   npx tsx scripts/populate-taxa.ts [--count 500] [--skip 0]
  *
  * This script:
  * 1. Fetches most-observed taxa from iNaturalist
- * 2. Enriches each with Wikipedia + Tavily (as fallback)
- * 3. Inserts into local D1 database
+ * 2. Enriches each with Wikipedia + DBPedia
+ * 3. Generates SQL for D1 database
  */
 
-const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const INAT_API = 'https://api.inaturalist.org/v1';
 const DBPEDIA_SPARQL = 'https://dbpedia.org/sparql';
 
@@ -189,45 +188,8 @@ async function fetchWikipediaSummary(taxonName: string): Promise<string | null> 
   }
 }
 
-// Search with Tavily for species info
-async function searchTavily(query: string): Promise<string | null> {
-  if (!TAVILY_API_KEY) return null;
-
-  try {
-    const res = await fetch('https://api.tavily.com/search', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        api_key: TAVILY_API_KEY,
-        query,
-        search_depth: 'basic',
-        include_answer: true,
-        max_results: 3,
-      }),
-    });
-
-    if (!res.ok) {
-      console.error(`Tavily error: ${res.status}`);
-      return null;
-    }
-
-    const data = await res.json() as { answer?: string; results?: { content: string }[] };
-
-    // Prefer the AI answer, fall back to first result content
-    if (data.answer) return data.answer;
-    if (data.results?.[0]?.content) return data.results[0].content.slice(0, 500);
-
-    return null;
-  } catch (err) {
-    console.error('Tavily error:', err);
-    return null;
-  }
-}
-
 // Extract structured traits from text using simple heuristics
-function extractTraits(text: string, taxonName: string): Partial<EnrichedTaxon> {
+function extractTraits(text: string, _taxonName: string): Partial<EnrichedTaxon> {
   const traits: Partial<EnrichedTaxon> = {};
   const lower = text.toLowerCase();
 
@@ -347,31 +309,6 @@ async function enrichTaxon(taxon: TaxonResult): Promise<EnrichedTaxon> {
   }
   await sleep(100); // DBPedia rate limit
 
-  // Only use Tavily as absolute last resort when Wikipedia+DBPedia both failed
-  if (!summary) {
-    console.log(`  Tavily (last resort): ${taxon.name}...`);
-    const tavilyResult = await searchTavily(`${taxon.name} species habitat diet conservation`);
-    if (tavilyResult) {
-      sources.push('tavily');
-      summary = tavilyResult;
-      const tavilyTraits = extractTraits(tavilyResult, taxon.name);
-      traits = { ...tavilyTraits, ...traits };
-    }
-    await sleep(200);
-
-    // Try common name if scientific name failed
-    if (!summary && taxon.preferred_common_name) {
-      console.log(`  Tavily (common name): ${taxon.preferred_common_name}...`);
-      const commonNameResult = await searchTavily(`${taxon.preferred_common_name} animal facts habitat diet`);
-      if (commonNameResult) {
-        sources.push('tavily');
-        summary = commonNameResult;
-        traits = extractTraits(commonNameResult, taxon.name);
-      }
-      await sleep(200);
-    }
-  }
-
   const now = Math.floor(Date.now() / 1000);
 
   return {
@@ -438,10 +375,6 @@ async function main() {
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--count' && args[i + 1]) count = parseInt(args[i + 1], 10);
     if (args[i] === '--skip' && args[i + 1]) skip = parseInt(args[i + 1], 10);
-  }
-
-  if (!TAVILY_API_KEY) {
-    console.warn('Warning: TAVILY_API_KEY not set. Will use Wikipedia only.');
   }
 
   console.log(`\nFetching ${count} popular taxa (skip ${skip})...\n`);
