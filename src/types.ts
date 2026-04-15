@@ -1,4 +1,7 @@
-export type Filters = { taxonId?: number; placeId?: number };
+export type Filters = {
+  taxonIds?: number[];  // Array of taxon IDs (comma-separated in API)
+  placeIds?: number[];  // Array of place IDs (comma-separated in API)
+};
 export type Observation = {
   id: number;
   lat: number;

@@ -1,7 +1,9 @@
 import type { Filters } from '../types';
 
 function buildKey(f: Filters): string {
-  return `t=${f.taxonId ?? ''}|p=${f.placeId ?? ''}`;
+  const taxa = (f.taxonIds ?? []).sort((a, b) => a - b).join(',');
+  const places = (f.placeIds ?? []).sort((a, b) => a - b).join(',');
+  return `t=${taxa}|p=${places}`;
 }
 
 export async function hashFilters(f: Filters): Promise<string> {
@@ -33,24 +35,24 @@ export function hashFiltersSync(f: Filters): string {
   return (h1 + h2s).slice(0, 12);
 }
 
-export const TAXON_PRESETS: { label: string; taxonId?: number }[] = [
+export const TAXON_PRESETS: { label: string; taxonIds?: number[] }[] = [
   { label: 'Any' },
-  { label: 'Birds', taxonId: 3 },
-  { label: 'Mammals', taxonId: 40151 },
-  { label: 'Reptiles', taxonId: 26036 },
-  { label: 'Amphibians', taxonId: 20978 },
-  { label: 'Fishes', taxonId: 47178 },
-  { label: 'Insects', taxonId: 47158 },
-  { label: 'Plants', taxonId: 47126 },
-  { label: 'Fungi', taxonId: 47170 },
+  { label: 'Birds', taxonIds: [3] },
+  { label: 'Mammals', taxonIds: [40151] },
+  { label: 'Reptiles', taxonIds: [26036] },
+  { label: 'Amphibians', taxonIds: [20978] },
+  { label: 'Fishes', taxonIds: [47178] },
+  { label: 'Insects', taxonIds: [47158] },
+  { label: 'Plants', taxonIds: [47126] },
+  { label: 'Fungi', taxonIds: [47170] },
 ];
 
-export const PLACE_PRESETS: { label: string; placeId?: number }[] = [
+export const PLACE_PRESETS: { label: string; placeIds?: number[] }[] = [
   { label: 'World' },
-  { label: 'North America', placeId: 97394 },
-  { label: 'South America', placeId: 97389 },
-  { label: 'Europe', placeId: 97391 },
-  { label: 'Africa', placeId: 97392 },
-  { label: 'Asia', placeId: 97395 },
-  { label: 'Oceania', placeId: 97393 },
+  { label: 'North America', placeIds: [97394] },
+  { label: 'South America', placeIds: [97389] },
+  { label: 'Europe', placeIds: [97391] },
+  { label: 'Africa', placeIds: [97392] },
+  { label: 'Asia', placeIds: [97395] },
+  { label: 'Oceania', placeIds: [97393] },
 ];

@@ -82,8 +82,8 @@ async function loadRound() {
   hintsUsed.value = 0;
   try {
     const params = new URLSearchParams();
-    if (props.filters.taxonId != null) params.set('taxon', String(props.filters.taxonId));
-    if (props.filters.placeId != null) params.set('place', String(props.filters.placeId));
+    if (props.filters.taxonIds?.length) params.set('taxa', props.filters.taxonIds.join(','));
+    if (props.filters.placeIds?.length) params.set('places', props.filters.placeIds.join(','));
     const qs = params.toString();
     const res = await fetch('/api/round' + (qs ? '?' + qs : ''));
     if (!res.ok) throw new Error('Failed to load observation');
@@ -157,9 +157,15 @@ function nextRound() {
 function saveHistory() {
   if (historySaved.value || !expeditionRounds.value.length) return;
   const taxonLabel =
-    TAXON_PRESETS.find((p) => p.taxonId === props.filters.taxonId)?.label ?? 'Any';
+    TAXON_PRESETS.find((p) =>
+      p.taxonIds?.length === props.filters.taxonIds?.length &&
+      p.taxonIds?.every((id, i) => id === props.filters.taxonIds?.[i])
+    )?.label ?? 'Any';
   const placeLabel =
-    PLACE_PRESETS.find((p) => p.placeId === props.filters.placeId)?.label ?? 'World';
+    PLACE_PRESETS.find((p) =>
+      p.placeIds?.length === props.filters.placeIds?.length &&
+      p.placeIds?.every((id, i) => id === props.filters.placeIds?.[i])
+    )?.label ?? 'World';
   const rec: GameRecord = {
     at: Date.now(),
     filterHash: filterHash.value,

@@ -20,8 +20,12 @@ export async function fetchObservationPool(filters: Filters): Promise<Observatio
     per_page: '200',
     order_by: 'random',
   });
-  if (filters.taxonId != null) params.set('taxon_id', String(filters.taxonId));
-  if (filters.placeId != null) params.set('place_id', String(filters.placeId));
+  if (filters.taxonIds?.length) {
+    params.set('taxon_id', filters.taxonIds.join(','));
+  }
+  if (filters.placeIds?.length) {
+    params.set('place_id', filters.placeIds.join(','));
+  }
 
   const url = `https://api.inaturalist.org/v1/observations?${params.toString()}`;
   const res = await inatFetch(url);

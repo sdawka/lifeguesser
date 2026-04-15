@@ -11,12 +11,16 @@ export const prerender = false;
 export const GET: APIRoute = async ({ url, locals }) => {
   try {
     const kv = getKV(locals);
-    const taxonId = url.searchParams.get('taxon');
-    const placeId = url.searchParams.get('place');
+    // Parse comma-separated IDs (new format) or single IDs (backwards compat)
+    const taxaParam = url.searchParams.get('taxa') ?? url.searchParams.get('taxon');
+    const placesParam = url.searchParams.get('places') ?? url.searchParams.get('place');
     const filters: Filters = {
-      taxonId: taxonId ? Number(taxonId) : undefined,
-      placeId: placeId ? Number(placeId) : undefined,
+      taxonIds: taxaParam ? taxaParam.split(',').map(Number).filter(Number.isFinite) : undefined,
+      placeIds: placesParam ? placesParam.split(',').map(Number).filter(Number.isFinite) : undefined,
     };
+    // Normalize empty arrays to undefined
+    if (filters.taxonIds?.length === 0) filters.taxonIds = undefined;
+    if (filters.placeIds?.length === 0) filters.placeIds = undefined;
 
     const ctx = (locals as any)?.runtime?.ctx;
     const pool = await getOrFetchPool(kv, filters, ctx);
