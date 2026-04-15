@@ -70,24 +70,39 @@ export const GET: APIRoute = async ({ url, locals }) => {
       lat: obs.lat, lng: obs.lng, taxonId: obs.taxonId, taxonName: obs.taxonName, observationUrl: obs.observationUrl, ancestry: obs.ancestry
     }), { expirationTtl: 600 });
 
-    // Background enrichment on repo miss / stale retryAfter.
-    try {
-      const existing = await repo.get(obs.taxonId ?? 0);
-      const now = Math.floor(Date.now() / 1000);
-      const fresh = existing && (!existing.retryAfter || existing.retryAfter < now);
+    // Background enrichment: enrich unenriched taxa from the pool to grow our DB
+    if (ctx?.waitUntil) {
+      ctx.waitUntil((async () => {
+        try {
+          const ids = enrichedIds ?? (repo.getEnrichedTaxonIds ? await repo.getEnrichedTaxonIds() : new Set());
 
-      if (!fresh && Number.isFinite(obs.taxonId) && ctx?.waitUntil) {
-        ctx.waitUntil(
-          enrichTaxon({
-            repo,
-            sources: ALL_SOURCES,
-            taxonId: obs.taxonId as number,
-            taxonName: obs.taxonName,
-          }).catch((e) => console.warn('background enrichTaxon failed', e))
-        );
-      }
-    } catch (e) {
-      console.warn('round enrichment scheduling failed', e);
+          // Find unenriched taxa from pool (unique by taxonId)
+          const seen = new Set<number>();
+          const unenriched: { taxonId: number; taxonName: string }[] = [];
+          for (const o of pool) {
+            if (o.taxonId && !ids.has(o.taxonId) && !seen.has(o.taxonId)) {
+              seen.add(o.taxonId);
+              unenriched.push({ taxonId: o.taxonId, taxonName: o.taxonName });
+            }
+          }
+
+          // Enrich up to 5 new taxa per request (rate limit friendly)
+          const toEnrich = unenriched.slice(0, 5);
+          for (const { taxonId, taxonName } of toEnrich) {
+            try {
+              await enrichTaxon({ repo, sources: ALL_SOURCES, taxonId, taxonName });
+            } catch (e) {
+              console.warn(`background enrichTaxon failed for ${taxonId}`, e);
+            }
+          }
+
+          if (toEnrich.length > 0) {
+            console.log(`Enriched ${toEnrich.length} new taxa in background`);
+          }
+        } catch (e) {
+          console.warn('background enrichment failed', e);
+        }
+      })());
     }
 
     const payload: RoundPayload = {
