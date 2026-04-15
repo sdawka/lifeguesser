@@ -94,9 +94,14 @@ watch([type, window], fetchLeaderboard);
     </div>
 
     <!-- Empty -->
-    <div v-else-if="!data?.entries.length" class="text-center py-12">
-      <div class="font-display italic text-xl text-ink-soft">No expeditions recorded yet</div>
-      <a href="/play" class="btn-ink mt-4 inline-block">Start an Expedition</a>
+    <div v-else-if="!data?.entries.length" class="text-center py-16">
+      <div class="text-6xl mb-4">🦤</div>
+      <div class="font-display italic text-2xl text-ink mb-2">The Hall Awaits Its First Naturalist</div>
+      <p class="text-ink-soft max-w-sm mx-auto mb-6">
+        No expeditions have been recorded{{ window === 'daily' ? ' today' : '' }} yet.
+        Be the first to identify specimens and claim your place in history.
+      </p>
+      <a href="/play" class="btn-ink inline-block">Begin Your Expedition</a>
     </div>
 
     <!-- Entries -->

@@ -8,6 +8,7 @@ import {
   setUserName,
   generateUserId,
 } from '../lib/user-storage';
+import { generateFunnyName } from '../lib/funny-names';
 import type { SubmitJournalResponse, SightingInput } from '../lib/leaderboard-types';
 
 const props = defineProps<{
@@ -25,7 +26,7 @@ const emit = defineEmits<{
 }>();
 
 const step = ref<'nickname' | 'submitting' | 'done'>('nickname');
-const nickname = ref(getUserName() ?? '');
+const nickname = ref(getUserName() ?? generateFunnyName());
 const error = ref<string | null>(null);
 const result = ref<SubmitJournalResponse | null>(null);
 
@@ -128,7 +129,7 @@ async function submit() {
           <input
             v-model="nickname"
             type="text"
-            placeholder="Intrepid Explorer"
+            placeholder="Curious Pangolin"
             maxlength="30"
             class="w-full border border-ink px-3 py-2 mb-3 bg-paper"
             :disabled="hasExistingUser"
