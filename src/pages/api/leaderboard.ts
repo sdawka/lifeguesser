@@ -49,6 +49,7 @@ export const GET: APIRoute = async ({ url, locals }) => {
     // Get top 10
     const topQuery = `
       SELECT
+        u.id as user_id,
         u.display_name,
         u.email_verified_at,
         j.${valueColumn} as value,
@@ -64,6 +65,7 @@ export const GET: APIRoute = async ({ url, locals }) => {
       .prepare(topQuery)
       .bind(...bindings)
       .all<{
+        user_id: string;
         display_name: string;
         email_verified_at: number | null;
         value: number;
@@ -72,6 +74,7 @@ export const GET: APIRoute = async ({ url, locals }) => {
 
     const entries: LeaderboardEntry[] = (topRows.results ?? []).map((row, i) => ({
       rank: i + 1,
+      userId: row.user_id,
       displayName: row.display_name,
       value: row.value,
       filterLabel: row.filter_label,

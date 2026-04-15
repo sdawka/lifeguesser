@@ -88,6 +88,7 @@ export type SubmitJournalResponse = {
 
 export type LeaderboardEntry = {
   rank: number;
+  userId: string;
   displayName: string;
   value: number;
   filterLabel: string;

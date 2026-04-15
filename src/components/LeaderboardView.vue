@@ -14,6 +14,7 @@ const window = ref<LeaderboardWindow>('allTime');
 const data = ref<LeaderboardResponse | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
+const currentUserId = ref<string | null>(null);
 
 async function fetchLeaderboard() {
   loading.value = true;
@@ -36,7 +37,10 @@ async function fetchLeaderboard() {
   }
 }
 
-onMounted(fetchLeaderboard);
+onMounted(() => {
+  currentUserId.value = getUserId();
+  fetchLeaderboard();
+});
 watch([type, window], fetchLeaderboard);
 </script>
 
@@ -111,7 +115,7 @@ watch([type, window], fetchLeaderboard);
         :key="entry.rank"
         :entry="entry"
         :type="type"
-        :is-current-user="false"
+        :is-current-user="currentUserId !== null && entry.userId === currentUserId"
       />
 
       <!-- User's rank (if not in top 10) -->
@@ -125,6 +129,7 @@ watch([type, window], fetchLeaderboard);
         <LeaderboardEntry
           :entry="{
             rank: data.userRank,
+            userId: currentUserId ?? '',
             displayName: 'You',
             value: data.userValue,
             filterLabel: '',

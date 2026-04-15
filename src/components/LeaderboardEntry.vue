@@ -42,7 +42,8 @@ function formatValue(value: number, type: LeaderboardType): string {
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
         <span class="font-medium truncate">{{ entry.displayName }}</span>
-        <span v-if="entry.verified" class="text-moss text-sm" title="Verified">✓</span>
+        <span v-if="isCurrentUser" class="text-moss text-sm font-medium">(You)</span>
+        <span v-if="entry.verified" class="text-moss text-sm" title="Verified">&#10003;</span>
       </div>
       <div class="text-xs text-ink-soft truncate">{{ entry.filterLabel }}</div>
     </div>
