@@ -9,6 +9,14 @@ import {
   type GameRecord,
   type GameRoundRecord,
 } from '../lib/storage';
+import {
+  getUserId,
+  setUserId,
+  getUserName,
+  setUserName,
+  generateUserId,
+} from '../lib/user-storage';
+import { generateFunnyName } from '../lib/funny-names';
 import { thresholdForRound } from '../lib/scoring';
 import StreakHud from './StreakHud.vue';
 import PhotoPanel from './PhotoPanel.vue';
@@ -42,6 +50,8 @@ const historySaved = ref(false);
 const showSubmitModal = ref(false);
 const journalSubmitted = ref(false);
 const submittedRank = ref<{ streak: number; totalScore: number } | null>(null);
+const autoSubmitting = ref(false);
+const autoSubmitName = ref<string | null>(null);
 
 const filterHash = computed(() => hashFiltersSync(props.filters));
 const threshold = computed(() => thresholdForRound(roundIndex.value));
@@ -127,6 +137,10 @@ async function submitGuess() {
       setBestStreak(filterHash.value, bestStreak.value);
       state.value = 'gameover';
       saveHistory();
+      // Auto-submit notable streaks (5+)
+      if (streak.value >= 5) {
+        autoSubmitJournal();
+      }
     }
   } catch (e: any) {
     errorMsg.value = e?.message ?? 'Failed to submit guess';
@@ -157,6 +171,66 @@ function saveHistory() {
   historySaved.value = true;
 }
 
+async function autoSubmitJournal() {
+  if (journalSubmitted.value) return;
+  autoSubmitting.value = true;
+
+  try {
+    // Get or generate userId
+    let userId = getUserId();
+    if (!userId) {
+      userId = generateUserId();
+      setUserId(userId);
+    }
+
+    // Get existing userName or generate a funny name
+    let name = getUserName();
+    if (!name) {
+      name = generateFunnyName();
+      setUserName(name);
+    }
+
+    // Register user
+    const regRes = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, nickname: name }),
+    });
+
+    if (!regRes.ok) {
+      const data = await regRes.json();
+      throw new Error(data.error ?? 'Registration failed');
+    }
+
+    // Submit journal
+    const journalRes = await fetch('/api/journal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        journalId: crypto.randomUUID(),
+        userId,
+        streak: streak.value,
+        totalScore: totalScore.value,
+        filterHash: filterHash.value,
+        filterLabel: 'Expedition',
+        rounds: roundsForSubmit.value,
+      }),
+    });
+
+    if (!journalRes.ok) {
+      const data = await journalRes.json();
+      throw new Error(data.error ?? 'Submission failed');
+    }
+
+    journalSubmitted.value = true;
+    autoSubmitName.value = name;
+  } catch (e: any) {
+    console.error('Auto-submit failed:', e?.message);
+  } finally {
+    autoSubmitting.value = false;
+  }
+}
+
 function onJournalSubmitted(response: SubmitJournalResponse) {
   journalSubmitted.value = true;
   submittedRank.value = response.rank;
@@ -170,6 +244,7 @@ function playAgain() {
   journalSubmitted.value = false;
   submittedRank.value = null;
   showSubmitModal.value = false;
+  autoSubmitName.value = null;
   loadRound();
 }
 
@@ -416,7 +491,7 @@ function formatCoord(lat: number, lng: number) {
           <template v-if="state === 'gameover'">
             <a href="/" class="btn-ghost">← Change Filters</a>
             <button
-              v-if="!journalSubmitted"
+              v-if="!journalSubmitted && streak < 5"
               type="button"
               class="btn-ink"
               @click="showSubmitModal = true"
@@ -439,6 +514,21 @@ function formatCoord(lat: number, lng: number) {
 
       <div v-if="errorMsg" class="mt-4 border border-rust text-rust px-4 py-2 font-mono text-xs uppercase tracking-widest2">
         ⚠ {{ errorMsg }}
+      </div>
+
+      <!-- Auto-submit toast -->
+      <div
+        v-if="autoSubmitting || autoSubmitName"
+        class="mt-4 border px-4 py-2 font-mono text-xs uppercase tracking-widest2"
+        :class="autoSubmitting ? 'border-ink/50 text-ink-soft' : 'border-moss text-moss'"
+      >
+        <template v-if="autoSubmitting">
+          Recording expedition…
+        </template>
+        <template v-else-if="autoSubmitName">
+          Expedition recorded as {{ autoSubmitName }}!
+          <a href="/leaderboard" class="underline ml-2">View leaderboard →</a>
+        </template>
       </div>
     </template>
     <PhotoLightbox
