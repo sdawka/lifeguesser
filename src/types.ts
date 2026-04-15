@@ -16,6 +16,16 @@ export type RoundPayload = {
   photoUrls: string[];
   attribution: { observer: string; license: string | null; url: string };
 };
+export type TaxonEnrichmentSummary = {
+  commonName?: string;
+  wikipediaSummary?: string;
+  diet?: string;
+  habitats?: string[];
+  continents?: string[];
+  iucnStatus?: string;
+  locomotion?: string;
+};
+
 export type GuessResult = {
   actualLat: number;
   actualLng: number;
@@ -26,5 +36,6 @@ export type GuessResult = {
   observationUrl: string;
   hintsUsed: number;
   scoreMultiplier: number;
+  enrichment?: TaxonEnrichmentSummary;
 };
 export type GameMode = 'endless';

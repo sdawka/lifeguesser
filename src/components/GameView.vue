@@ -289,6 +289,9 @@ function formatCoord(lat: number, lng: number) {
             <div class="font-display italic text-3xl md:text-4xl leading-tight" style="font-variation-settings: 'opsz' 144;">
               {{ result.taxonName }}
             </div>
+            <div v-if="result.enrichment?.commonName" class="text-ink-soft text-lg mt-1">
+              {{ result.enrichment.commonName }}
+            </div>
             <a
               :href="result.observationUrl"
               target="_blank"
@@ -312,6 +315,56 @@ function formatCoord(lat: number, lng: number) {
             <div v-if="result.hintsUsed > 0" class="font-mono text-[0.62rem] uppercase tracking-widest2 text-ink-soft mt-1">
               score reduced by hints: ×{{ result.scoreMultiplier.toFixed(2) }}
             </div>
+          </div>
+        </div>
+
+        <!-- Species info section -->
+        <div v-if="result.enrichment" class="px-5 py-4 border-t border-ink/30">
+          <!-- Wikipedia summary -->
+          <p v-if="result.enrichment.wikipediaSummary" class="font-serif text-ink-soft leading-relaxed mb-4">
+            {{ result.enrichment.wikipediaSummary }}
+          </p>
+
+          <!-- Trait tags -->
+          <div class="flex flex-wrap gap-2">
+            <span
+              v-if="result.enrichment.diet"
+              class="px-2 py-1 bg-paper border border-ink/30 font-mono text-[0.65rem] uppercase tracking-widest2"
+            >
+              🍽 {{ result.enrichment.diet }}
+            </span>
+            <span
+              v-if="result.enrichment.locomotion"
+              class="px-2 py-1 bg-paper border border-ink/30 font-mono text-[0.65rem] uppercase tracking-widest2"
+            >
+              {{ result.enrichment.locomotion === 'aerial' ? '🦅' : result.enrichment.locomotion === 'aquatic' ? '🐟' : result.enrichment.locomotion === 'arboreal' ? '🌳' : result.enrichment.locomotion === 'fossorial' ? '🕳' : '🦶' }} {{ result.enrichment.locomotion }}
+            </span>
+            <span
+              v-if="result.enrichment.iucnStatus"
+              class="px-2 py-1 border font-mono text-[0.65rem] uppercase tracking-widest2"
+              :class="{
+                'bg-rust/10 border-rust text-rust': ['CR', 'EN'].includes(result.enrichment.iucnStatus),
+                'bg-amber-100 border-amber-600 text-amber-700': ['VU', 'NT'].includes(result.enrichment.iucnStatus),
+                'bg-moss/10 border-moss text-moss': result.enrichment.iucnStatus === 'LC',
+                'bg-paper border-ink/30': !['CR', 'EN', 'VU', 'NT', 'LC'].includes(result.enrichment.iucnStatus),
+              }"
+            >
+              {{ result.enrichment.iucnStatus === 'CR' ? '🔴 Critically Endangered' : result.enrichment.iucnStatus === 'EN' ? '🟠 Endangered' : result.enrichment.iucnStatus === 'VU' ? '🟡 Vulnerable' : result.enrichment.iucnStatus === 'NT' ? '🟡 Near Threatened' : result.enrichment.iucnStatus === 'LC' ? '🟢 Least Concern' : result.enrichment.iucnStatus }}
+            </span>
+            <span
+              v-for="habitat in (result.enrichment.habitats || []).slice(0, 3)"
+              :key="habitat"
+              class="px-2 py-1 bg-paper border border-ink/30 font-mono text-[0.65rem] uppercase tracking-widest2"
+            >
+              {{ habitat === 'forest' ? '🌲' : habitat === 'grassland' ? '🌾' : habitat === 'wetland' ? '🪷' : habitat === 'desert' ? '🏜' : habitat === 'marine' ? '🌊' : habitat === 'freshwater' ? '💧' : habitat === 'urban' ? '🏙' : habitat === 'mountain' ? '⛰' : '🌍' }} {{ habitat }}
+            </span>
+            <span
+              v-for="continent in (result.enrichment.continents || []).slice(0, 2)"
+              :key="continent"
+              class="px-2 py-1 bg-paper border border-ink/30 font-mono text-[0.65rem] uppercase tracking-widest2"
+            >
+              🗺 {{ continent.replace('_', ' ') }}
+            </span>
           </div>
         </div>
       </div>
