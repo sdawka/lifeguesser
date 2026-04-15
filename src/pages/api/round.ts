@@ -11,10 +11,12 @@ export const prerender = false;
 export const GET: APIRoute = async ({ url, locals }) => {
   try {
     const kv = getKV(locals);
+    const repo = getTaxonRepo(locals);
+
     // Parse comma-separated IDs (new format) or single IDs (backwards compat)
     const taxaParam = url.searchParams.get('taxa') ?? url.searchParams.get('taxon');
     const placesParam = url.searchParams.get('places') ?? url.searchParams.get('place');
-    const filters: Filters = {
+    let filters: Filters = {
       taxonIds: taxaParam ? taxaParam.split(',').map(Number).filter(Number.isFinite) : undefined,
       placeIds: placesParam ? placesParam.split(',').map(Number).filter(Number.isFinite) : undefined,
     };
@@ -22,19 +24,38 @@ export const GET: APIRoute = async ({ url, locals }) => {
     if (filters.taxonIds?.length === 0) filters.taxonIds = undefined;
     if (filters.placeIds?.length === 0) filters.placeIds = undefined;
 
+    // When no taxa filter, use enriched taxon IDs to ensure hints work
+    // Sample up to 30 random enriched taxa to keep URL reasonable
+    let enrichedIds: Set<number> | null = null;
+    if (!filters.taxonIds && repo.getEnrichedTaxonIds) {
+      try {
+        enrichedIds = await repo.getEnrichedTaxonIds();
+        if (enrichedIds.size > 0) {
+          const allIds = Array.from(enrichedIds);
+          // Shuffle and take 30 random enriched taxa
+          for (let i = allIds.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allIds[i], allIds[j]] = [allIds[j], allIds[i]];
+          }
+          filters = { ...filters, taxonIds: allIds.slice(0, 30) };
+        }
+      } catch (e) {
+        console.warn('Failed to get enriched taxa for filtering', e);
+      }
+    }
+
     const ctx = (locals as any)?.runtime?.ctx;
     const pool = await getOrFetchPool(kv, filters, ctx);
     if (!pool.length) {
       return new Response(JSON.stringify({ error: 'No observations found' }), { status: 404 });
     }
 
-    // Prefer observations we have enrichment data for (hints will work)
-    const repo = getTaxonRepo(locals);
+    // Additional filter to enriched taxa (in case pool was cached before enrichment)
     let enrichedPool = pool;
-    if (repo.getEnrichedTaxonIds) {
+    if (enrichedIds || repo.getEnrichedTaxonIds) {
       try {
-        const enrichedIds = await repo.getEnrichedTaxonIds();
-        const filtered = pool.filter(o => o.taxonId && enrichedIds.has(o.taxonId));
+        const ids = enrichedIds ?? await repo.getEnrichedTaxonIds();
+        const filtered = pool.filter(o => o.taxonId && ids.has(o.taxonId));
         if (filtered.length > 0) {
           enrichedPool = filtered;
         }
