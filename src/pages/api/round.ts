@@ -23,7 +23,23 @@ export const GET: APIRoute = async ({ url, locals }) => {
     if (!pool.length) {
       return new Response(JSON.stringify({ error: 'No observations found' }), { status: 404 });
     }
-    const obs = pool[Math.floor(Math.random() * pool.length)];
+
+    // Prefer observations we have enrichment data for (hints will work)
+    const repo = getTaxonRepo(locals);
+    let enrichedPool = pool;
+    if (repo.getEnrichedTaxonIds) {
+      try {
+        const enrichedIds = await repo.getEnrichedTaxonIds();
+        const filtered = pool.filter(o => o.taxonId && enrichedIds.has(o.taxonId));
+        if (filtered.length > 0) {
+          enrichedPool = filtered;
+        }
+      } catch (e) {
+        console.warn('Failed to filter by enriched taxa', e);
+      }
+    }
+
+    const obs = enrichedPool[Math.floor(Math.random() * enrichedPool.length)];
     const roundId = crypto.randomUUID();
     await kv.put(`round:${roundId}`, JSON.stringify({
       lat: obs.lat, lng: obs.lng, taxonId: obs.taxonId, taxonName: obs.taxonName, observationUrl: obs.observationUrl, ancestry: obs.ancestry
@@ -31,7 +47,6 @@ export const GET: APIRoute = async ({ url, locals }) => {
 
     // Background enrichment on repo miss / stale retryAfter.
     try {
-      const repo = getTaxonRepo(locals);
       const existing = await repo.get(obs.taxonId ?? 0);
       const now = Math.floor(Date.now() / 1000);
       const fresh = existing && (!existing.retryAfter || existing.retryAfter < now);

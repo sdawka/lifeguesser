@@ -95,6 +95,13 @@ function rowToEnrichment(row: D1Row): TaxonEnrichment {
 export class D1TaxonRepo implements TaxonRepo {
   constructor(private readonly db: D1Database) {}
 
+  /** Get all taxon IDs that have enrichment data */
+  async getEnrichedTaxonIds(): Promise<Set<number>> {
+    const stmt = this.db.prepare('SELECT taxon_id FROM taxon_enrichment');
+    const result = await stmt.all<{ taxon_id: number }>();
+    return new Set(result.results.map(r => r.taxon_id));
+  }
+
   async get(taxonId: number): Promise<TaxonEnrichment | null> {
     const stmt = this.db.prepare(
       'SELECT * FROM taxon_enrichment WHERE taxon_id = ?'
