@@ -8,3 +8,4 @@ dist
 
 # Generated SQL output from seed scripts (populate-taxa.ts, populate-observations.ts, etc.)
 scripts/*.sql
+/reenrich*.sql

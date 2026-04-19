@@ -19,6 +19,7 @@ interface D1Row {
   locomotion: string | null;
   locomotion_source: string | null;
   wikipedia_summary: string | null;
+  location_quip: string | null;
   enriched_at: number;
   sources_attempted: string;
   schema_version: number;
@@ -95,9 +96,19 @@ function rowToEnrichment(row: D1Row): TaxonEnrichment {
 export class D1TaxonRepo implements TaxonRepo {
   constructor(private readonly db: D1Database) {}
 
-  /** Get all taxon IDs that have enrichment data */
+  /** Get taxon IDs with 2+ hints (usable for gameplay) */
   async getEnrichedTaxonIds(): Promise<Set<number>> {
-    const stmt = this.db.prepare('SELECT taxon_id FROM taxon_enrichment');
+    const stmt = this.db.prepare(`
+      SELECT taxon_id FROM taxon_enrichment
+      WHERE (
+        CASE WHEN diet IS NOT NULL THEN 1 ELSE 0 END +
+        CASE WHEN habitats IS NOT NULL THEN 1 ELSE 0 END +
+        CASE WHEN locomotion IS NOT NULL THEN 1 ELSE 0 END +
+        CASE WHEN iucn_status IS NOT NULL THEN 1 ELSE 0 END +
+        CASE WHEN wikipedia_summary IS NOT NULL THEN 1 ELSE 0 END +
+        CASE WHEN location_quip IS NOT NULL THEN 1 ELSE 0 END
+      ) >= 2
+    `);
     const result = await stmt.all<{ taxon_id: number }>();
     return new Set(result.results.map(r => r.taxon_id));
   }
@@ -159,5 +170,22 @@ export class D1TaxonRepo implements TaxonRepo {
       if (rec) map.set(id, rec);
     }
     return map;
+  }
+
+  /** Get stored location quip for a taxon */
+  async getQuip(taxonId: number): Promise<string | null> {
+    const stmt = this.db.prepare(
+      'SELECT location_quip FROM taxon_enrichment WHERE taxon_id = ?'
+    ).bind(taxonId);
+    const result = await stmt.first<{ location_quip: string | null }>();
+    return result?.location_quip ?? null;
+  }
+
+  /** Store a location quip for a taxon */
+  async setQuip(taxonId: number, quip: string): Promise<void> {
+    const stmt = this.db.prepare(
+      'UPDATE taxon_enrichment SET location_quip = ? WHERE taxon_id = ?'
+    ).bind(quip, taxonId);
+    await stmt.run();
   }
 }

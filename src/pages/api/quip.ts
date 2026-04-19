@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getKV } from '../../lib/kv';
+import { D1TaxonRepo } from '../../lib/repo/d1';
 
 export const prerender = false;
 
@@ -8,6 +9,9 @@ const MODEL = 'google/gemini-3.1-flash-lite-preview';
 export const POST: APIRoute = async ({ request, locals }) => {
   try {
     const kv = getKV(locals);
+    const db = (locals as any)?.runtime?.env?.DB;
+    const repo = db ? new D1TaxonRepo(db) : null;
+
     const apiKey =
       (locals as any)?.runtime?.env?.OPENROUTER_KEY ??
       (import.meta as any)?.env?.OPENROUTER_KEY;
@@ -28,6 +32,18 @@ export const POST: APIRoute = async ({ request, locals }) => {
       | null;
     if (!stored) {
       return new Response(JSON.stringify({ error: 'Round expired or not found' }), { status: 404 });
+    }
+
+    // Check D1 first for a permanent quip
+    if (stored.taxonId != null && repo) {
+      const d1Quip = await repo.getQuip(stored.taxonId);
+      if (d1Quip) {
+        // Also cache in KV for faster subsequent requests
+        await kv.put(`quip:taxon:${stored.taxonId}`, d1Quip, { expirationTtl: 60 * 60 * 24 * 7 });
+        return new Response(JSON.stringify({ quip: d1Quip, cached: true, source: 'd1' }), {
+          headers: { 'content-type': 'application/json' },
+        });
+      }
     }
 
     // Cache per-taxon (7d) so the same quip is reused across rounds for the same species.
@@ -87,6 +103,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     await kv.put(cacheKey, quip, { expirationTtl: cacheTtl });
+
+    // Store permanently in D1 for future use
+    if (stored.taxonId != null && repo) {
+      await repo.setQuip(stored.taxonId, quip);
+    }
 
     return new Response(JSON.stringify({ quip, cached: false }), {
       headers: { 'content-type': 'application/json' },
