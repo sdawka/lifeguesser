@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed, onMounted } from 'vue';
+import { ref, watch, computed, onMounted, nextTick } from 'vue';
 import type { HintCategory } from '../lib/hints/categories';
 
 const props = defineProps<{
@@ -20,6 +20,16 @@ const phase = ref<Phase>('loading');
 const categories = ref<HintCategory[]>([]);
 const usedCategories = ref<Set<HintCategory>>(new Set());
 const errorMsg = ref<string | null>(null);
+const sectionEl = ref<HTMLElement | null>(null);
+
+// When a hint expands (question or answered view), the new content can land
+// below the fold. Pull the whole card into view — block:'nearest' only
+// scrolls if it needs to.
+watch(phase, async (p) => {
+  if (p !== 'question' && p !== 'answered') return;
+  await nextTick();
+  sectionEl.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
 
 const activeCategory = ref<HintCategory | null>(null);
 const activeQuestion = ref<string | null>(null);
@@ -228,7 +238,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="border border-ink bg-paper-dark">
+  <section ref="sectionEl" class="border border-ink bg-paper-dark scroll-mt-4">
     <div class="px-4 py-2 border-b border-ink flex items-baseline justify-between gap-3">
       <div class="eyebrow">Consult Field Guide</div>
       <div class="font-mono text-[0.65rem] uppercase tracking-widest2 text-ink-soft">
