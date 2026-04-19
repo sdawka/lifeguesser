@@ -50,8 +50,11 @@ a { color: inherit; }
 /* Double border frame — specimen plate */
 .plate-frame {
   padding: 10px;
-  border: 1px solid var(--ink);
-  box-shadow: inset 0 0 0 1px var(--paper), inset 0 0 0 2px var(--ink);
+  border: 2px solid var(--ink);
+  box-shadow:
+    inset 0 0 0 1px var(--paper),
+    inset 0 0 0 3px var(--ink),
+    3px 3px 0 var(--ink);
   background: var(--paper-dark);
 }
 
