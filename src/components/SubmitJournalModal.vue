@@ -100,7 +100,7 @@ async function submit() {
 <template>
   <div
     v-if="open"
-    class="fixed inset-0 bg-ink/50 flex items-center justify-center z-50"
+    class="fixed inset-0 bg-ink/50 flex items-center justify-center z-overlay"
     @click.self="emit('close')"
   >
     <div class="bg-paper border border-ink p-6 max-w-sm w-full mx-4">

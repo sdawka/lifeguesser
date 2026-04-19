@@ -136,6 +136,13 @@ a { color: inherit; }
   line-height: 1;
 }
 
+/* Stacking context for modals / lightboxes / dropdowns — must sit above
+   Leaflet (which creates its own stacking contexts up to z-index ~1000).
+   Use this on every full-screen overlay. */
+.z-overlay {
+  z-index: 9999;
+}
+
 /* Ornamental divider with centered glyph */
 .ornament {
   display: flex;
