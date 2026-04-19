@@ -270,21 +270,21 @@ onMounted(() => {
       </button>
     </div>
 
-    <!-- Menu -->
-    <div v-else-if="phase === 'menu'" class="px-4 py-4">
-      <div v-if="availableCategories.length === 0" class="font-serif italic text-ink-soft">
+    <!-- Menu — compact chip row so it doesn't dominate the plate pane -->
+    <div v-else-if="phase === 'menu'" class="px-3 py-2">
+      <div v-if="availableCategories.length === 0" class="font-serif italic text-ink-soft text-sm">
         No further entries in the field guide for this specimen.
       </div>
-      <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div v-else class="flex flex-wrap gap-1.5">
         <button
           v-for="c in availableCategories"
           :key="c"
           type="button"
-          class="border border-ink bg-paper hover:bg-paper-dark px-3 py-3 flex items-center gap-3 text-left transition-colors"
+          class="border border-ink bg-paper hover:bg-paper-dark px-2.5 py-1.5 inline-flex items-center gap-2 text-left transition-colors"
           @click="pickCategory(c)"
         >
-          <span class="font-display text-2xl text-rust w-6 text-center">{{ symbolFor(c) }}</span>
-          <span class="font-mono text-[0.72rem] uppercase tracking-widest2">{{ labelFor(c) }}</span>
+          <span class="font-display text-lg text-rust leading-none">{{ symbolFor(c) }}</span>
+          <span class="font-mono text-[0.66rem] uppercase tracking-widest2">{{ labelFor(c) }}</span>
         </button>
       </div>
     </div>
