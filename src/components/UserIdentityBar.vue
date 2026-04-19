@@ -72,7 +72,7 @@ onMounted(fetchUser);
     <!-- Verify Modal -->
     <div
       v-if="showVerifyModal"
-      class="fixed inset-0 bg-ink/50 flex items-center justify-center z-50"
+      class="fixed inset-0 bg-ink/50 flex items-center justify-center z-overlay"
       @click.self="showVerifyModal = false"
     >
       <div class="bg-paper border border-ink p-6 max-w-sm w-full mx-4">
