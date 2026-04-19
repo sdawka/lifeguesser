@@ -40,6 +40,7 @@ const mobilePane = ref<'plate' | 'chart'>('plate');
 const result = ref<GuessResult | null>(null);
 const roundIndex = ref(0);
 const streak = ref(0);
+const expeditionBestStreak = ref(0);
 const bestStreak = ref(0);
 const errorMsg = ref<string | null>(null);
 const submitting = ref(false);
@@ -175,26 +176,22 @@ async function submitGuess() {
       passed: r.passed,
       taxonName: r.taxonName,
     });
+    // Score is per-round and always accumulates; streak tracks consecutive
+    // correct answers and resets on a miss. Both are separate metrics.
     if (r.passed) {
       streak.value += 1;
-      if (streak.value > bestStreak.value) {
-        bestStreak.value = streak.value;
-        setBestStreak(filterHash.value, bestStreak.value);
-      }
-      state.value = 'revealing';
-      // Quietly queue up the next specimen + warm its photo cache while
-      // the user reads the field-notes card.
-      prefetchNextRound();
+      if (streak.value > expeditionBestStreak.value) expeditionBestStreak.value = streak.value;
     } else {
-      if (streak.value > bestStreak.value) bestStreak.value = streak.value;
-      setBestStreak(filterHash.value, bestStreak.value);
-      state.value = 'gameover';
-      saveHistory();
-      // Auto-submit notable streaks (5+)
-      if (streak.value >= 5) {
-        autoSubmitJournal();
-      }
+      streak.value = 0;
     }
+    if (expeditionBestStreak.value > bestStreak.value) {
+      bestStreak.value = expeditionBestStreak.value;
+      setBestStreak(filterHash.value, bestStreak.value);
+    }
+    state.value = 'revealing';
+    // Quietly queue up the next specimen + warm its photo cache while
+    // the user reads the field-notes card.
+    prefetchNextRound();
   } catch (e: any) {
     errorMsg.value = e?.message ?? 'Failed to submit guess';
   } finally {
@@ -205,6 +202,16 @@ async function submitGuess() {
 function nextRound() {
   roundIndex.value += 1;
   loadRound();
+}
+
+function endExpedition() {
+  if (!expeditionRounds.value.length) return;
+  state.value = 'gameover';
+  saveHistory();
+  // Auto-submit notable expeditions (peak streak ≥ 5).
+  if (expeditionBestStreak.value >= 5) {
+    autoSubmitJournal();
+  }
 }
 
 function saveHistory() {
@@ -223,7 +230,7 @@ function saveHistory() {
     at: Date.now(),
     filterHash: filterHash.value,
     filterLabel: `${taxonLabel} · ${placeLabel}`,
-    finalStreak: streak.value,
+    finalStreak: expeditionBestStreak.value,
     rounds: expeditionRounds.value.slice(),
   };
   appendGameRecord(rec);
@@ -268,7 +275,7 @@ async function autoSubmitJournal() {
       body: JSON.stringify({
         journalId: crypto.randomUUID(),
         userId,
-        streak: streak.value,
+        streak: expeditionBestStreak.value,
         totalScore: totalScore.value,
         filterHash: filterHash.value,
         filterLabel: 'Expedition',
@@ -297,6 +304,7 @@ function onJournalSubmitted(response: SubmitJournalResponse) {
 
 function playAgain() {
   streak.value = 0;
+  expeditionBestStreak.value = 0;
   roundIndex.value = 0;
   expeditionRounds.value = [];
   historySaved.value = false;
@@ -333,7 +341,7 @@ function formatCoord(lat: number, lng: number) {
   <div class="max-w-6xl mx-auto">
     <!-- HUD -->
     <div class="mb-2">
-      <StreakHud :current="streak" :best="bestStreak" :threshold="threshold" :multiplier="multiplier" />
+      <StreakHud :current="streak" :best="bestStreak" :threshold="threshold" :multiplier="multiplier" :total="totalScore" />
     </div>
 
     <!-- Action bar — sits under the HUD so Submit is always in view -->
@@ -388,6 +396,14 @@ function formatCoord(lat: number, lng: number) {
           @click="submitGuess"
         >
           {{ submitting ? 'Submitting…' : 'Submit Guess →' }}
+        </button>
+        <button
+          v-if="state === 'revealing'"
+          type="button"
+          class="btn-ghost"
+          @click="endExpedition"
+        >
+          ⊗ End Expedition
         </button>
         <button
           v-if="state === 'revealing'"
@@ -684,6 +700,9 @@ function formatCoord(lat: number, lng: number) {
              is reachable without scrolling back up. -->
         <div class="px-5 py-3 border-t border-ink flex flex-wrap items-center justify-end gap-3 bg-paper">
           <template v-if="state === 'revealing'">
+            <button type="button" class="btn-ghost" @click="endExpedition">
+              ⊗ End Expedition
+            </button>
             <button type="button" class="btn-ink" @click="nextRound">
               Next Specimen →
             </button>
@@ -736,7 +755,7 @@ function formatCoord(lat: number, lng: number) {
     />
     <SubmitJournalModal
       :open="showSubmitModal"
-      :streak="streak"
+      :streak="expeditionBestStreak"
       :total-score="totalScore"
       :filter-hash="filterHash"
       :filter-label="expeditionRounds.length > 0 ? `Expedition` : 'All · World'"
