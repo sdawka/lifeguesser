@@ -536,7 +536,7 @@ function formatCoord(lat: number, lng: number) {
         <!-- Right: map -->
         <section :class="{ 'hidden md:block': mobilePane !== 'chart' }">
           <div class="flex items-baseline gap-3 mb-2">
-            <span class="eyebrow">Chart</span>
+            <span class="eyebrow eyebrow--chip">Chart</span>
             <span class="font-mono text-[0.68rem] uppercase tracking-widest2 text-ink-soft">
               {{ state === 'guessing' ? 'Mark your hypothesis' : 'Disclosure' }}
             </span>
