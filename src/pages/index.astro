@@ -1,4 +1,5 @@
 ---
+import { ViewTransitions } from 'astro:transitions';
 import FilterPicker from '../components/FilterPicker.vue';
 import UserIdentity from '../components/UserIdentity.vue';
 import '../styles/global.css';
@@ -9,6 +10,7 @@ import '../styles/global.css';
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>LifeGuesser — A Field Guide Game</title>
     <meta name="description" content="A geographical parlour game for the modern naturalist. Guess where in the world each specimen was observed." />
+    <ViewTransitions />
   </head>
   <body class="min-h-screen flex flex-col">
     <!-- Masthead -->
@@ -33,7 +35,7 @@ import '../styles/global.css';
           <div class="eyebrow mb-6">A Geographical Parlour Game</div>
         </div>
 
-        <h1 class="font-display text-center leading-[0.85] rise rise-3">
+        <h1 class="font-display text-center leading-[0.85] rise rise-3" transition:name="site-logo">
           <span class="block italic font-light text-[clamp(4rem,14vw,10rem)]" style="font-variation-settings: 'SOFT' 100, 'opsz' 144;">Life</span>
           <span class="block font-semibold text-[clamp(3.5rem,12vw,8.5rem)] -mt-2 tracking-tight" style="font-variation-settings: 'opsz' 144;">Guesser</span>
         </h1>
