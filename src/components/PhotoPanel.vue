@@ -22,7 +22,9 @@ watch(
   }
 );
 
-const visibleUrls = computed(() => props.photoUrls.filter((u) => !failedUrls.value.has(u)));
+const MAX_PHOTOS = 5;
+const displayedUrls = computed(() => props.photoUrls.slice(0, MAX_PHOTOS));
+const visibleUrls = computed(() => displayedUrls.value.filter((u) => !failedUrls.value.has(u)));
 const currentUrl = computed(() => visibleUrls.value[currentIndex.value] ?? visibleUrls.value[0] ?? '');
 const hasMultiple = computed(() => visibleUrls.value.length > 1);
 const isLoaded = computed(() => !!currentUrl.value && loadedUrls.value.has(currentUrl.value));
@@ -57,7 +59,7 @@ function onLoad() {
   });
 }
 function selectThumb(i: number) {
-  const url = props.photoUrls[i];
+  const url = displayedUrls.value[i];
   if (!url || failedUrls.value.has(url)) return;
   const idx = visibleUrls.value.indexOf(url);
   if (idx >= 0) currentIndex.value = idx;
@@ -125,9 +127,10 @@ function selectThumb(i: number) {
       </div>
     </div>
 
-    <div v-if="photoUrls.length > 1" class="flex gap-2 flex-wrap">
+    <div class="flex items-center gap-2 flex-wrap">
       <button
-        v-for="(url, i) in photoUrls"
+        v-for="(url, i) in displayedUrls"
+        v-show="displayedUrls.length > 1"
         :key="url"
         type="button"
         class="w-14 h-14 border border-ink p-0.5 transition"
@@ -140,6 +143,14 @@ function selectThumb(i: number) {
       >
         <img :src="url" class="w-full h-full object-cover block" alt="" />
       </button>
+      <a
+        :href="attribution.url"
+        target="_blank"
+        rel="noopener"
+        class="link-ink font-mono text-[0.65rem] uppercase tracking-widest2 ml-auto"
+      >
+        iNaturalist ↗
+      </a>
     </div>
 
     <figcaption class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
@@ -153,9 +164,6 @@ function selectThumb(i: number) {
       <span class="font-mono text-[0.65rem] uppercase tracking-widest2 text-ink-soft">
         {{ attribution.license ?? 'All rights reserved' }}
       </span>
-      <a :href="attribution.url" target="_blank" rel="noopener" class="link-ink font-mono text-[0.65rem] uppercase tracking-widest2">
-        iNaturalist ↗
-      </a>
     </figcaption>
   </figure>
 </template>
