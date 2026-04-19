@@ -8,7 +8,10 @@
     "build": "astro build",
     "preview": "astro preview",
     "test": "vitest",
-    "astro": "astro"
+    "astro": "astro",
+    "deploy": "astro build && wrangler pages deploy dist --project-name lifeguesser --branch main --commit-dirty=true",
+    "db:migrate": "wrangler d1 execute lifeguesser-db --remote --file",
+    "db:seed": "npx tsx scripts/populate-observations.ts"
   },
   "dependencies": {
     "astro": "^4.16.0",
