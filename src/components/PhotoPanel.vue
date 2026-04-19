@@ -7,7 +7,13 @@ const props = defineProps<{
   figNumber?: number;
 }>();
 
-defineEmits<{ (e: 'zoom', url: string): void }>();
+const emit = defineEmits<{ (e: 'zoom', url: string, fromRect: DOMRect): void }>();
+
+function onPhotoClick(ev: MouseEvent) {
+  const target = ev.currentTarget as HTMLElement | null;
+  if (!currentUrl.value || !target) return;
+  emit('zoom', currentUrl.value, target.getBoundingClientRect());
+}
 
 const currentIndex = ref(0);
 const failedUrls = ref<Set<string>>(new Set());
@@ -78,7 +84,7 @@ function selectThumb(i: number) {
         :class="{ 'plate-image--ready': isLoaded }"
         loading="eager"
         decoding="async"
-        @click="$emit('zoom', currentUrl)"
+        @click="onPhotoClick"
         @load="onLoad"
         @error="onError"
       />

@@ -47,6 +47,7 @@ const hintsUsed = ref(0);
 const multiplier = computed(() => [1, 0.8, 0.6, 0.4, 0.2][hintsUsed.value] ?? 1);
 const lightboxOpen = ref(false);
 const lightboxUrl = ref('');
+const lightboxFromRect = ref<DOMRect | null>(null);
 const expeditionRounds = ref<GameRoundRecord[]>([]);
 const historySaved = ref(false);
 const showSubmitModal = ref(false);
@@ -522,7 +523,7 @@ function formatCoord(lat: number, lng: number) {
             :photo-urls="round.photoUrls"
             :attribution="round.attribution"
             :fig-number="roundIndex + 1"
-            @zoom="(url) => { lightboxUrl = url; lightboxOpen = true; }"
+            @zoom="(url, rect) => { lightboxUrl = url; lightboxFromRect = rect; lightboxOpen = true; }"
           />
           <div v-if="state === 'guessing'" class="mt-3">
             <HintCategories
@@ -697,6 +698,7 @@ function formatCoord(lat: number, lng: number) {
     <PhotoLightbox
       :open="lightboxOpen"
       :url="lightboxUrl"
+      :from-rect="lightboxFromRect"
       :caption="'Fig. ' + String(roundIndex + 1).padStart(2, '0')"
       @close="lightboxOpen = false"
     />
