@@ -76,6 +76,7 @@ const totalScore = computed(() =>
 );
 
 const guessMapRef = useTemplateRef<InstanceType<typeof GuessMap>>('guessMapRef');
+const fieldNotesRef = useTemplateRef<HTMLElement>('fieldNotesRef');
 
 function roundUrl(): string {
   const params = new URLSearchParams();
@@ -163,6 +164,10 @@ async function submitGuess() {
     result.value = r;
     // On mobile, show the chart so the user sees their pin vs the actual.
     mobilePane.value = 'chart';
+    // Scroll the field-notes card into view to reveal the answer.
+    nextTick(() => {
+      fieldNotesRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     expeditionRounds.value.push({
       distanceKm: r.distanceKm,
       score: r.score,
@@ -575,7 +580,7 @@ function formatCoord(lat: number, lng: number) {
       </div>
 
       <!-- Result field-notes card -->
-      <div v-if="result" class="mt-8 border border-ink bg-paper-dark">
+      <div v-if="result" ref="fieldNotesRef" class="mt-8 border border-ink bg-paper-dark scroll-mt-4">
         <div class="px-5 py-3 border-b border-ink flex items-baseline justify-between gap-4 flex-wrap">
           <div class="flex items-baseline gap-3">
             <span class="eyebrow">Field Notes</span>
@@ -673,6 +678,33 @@ function formatCoord(lat: number, lng: number) {
               🗺 {{ continent.replace('_', ' ') }}
             </span>
           </div>
+        </div>
+
+        <!-- Field-notes footer: mirrors the action-bar CTAs so the next step
+             is reachable without scrolling back up. -->
+        <div class="px-5 py-3 border-t border-ink flex flex-wrap items-center justify-end gap-3 bg-paper">
+          <template v-if="state === 'revealing'">
+            <button type="button" class="btn-ink" @click="nextRound">
+              Next Specimen →
+            </button>
+          </template>
+          <template v-else-if="state === 'gameover'">
+            <a href="/" class="btn-ghost">← Change Filters</a>
+            <button
+              v-if="!journalSubmitted && streak < 5"
+              type="button"
+              class="btn-ghost"
+              @click="showSubmitModal = true"
+            >
+              Submit to Leaderboard
+            </button>
+            <a v-if="journalSubmitted" href="/leaderboard" class="btn-ghost">
+              View Leaderboard
+            </a>
+            <button type="button" class="btn-ink" @click="playAgain">
+              New Expedition →
+            </button>
+          </template>
         </div>
       </div>
 
