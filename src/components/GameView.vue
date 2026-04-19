@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, useTemplateRef } from 'vue';
+import { ref, computed, onMounted, useTemplateRef, watch, nextTick } from 'vue';
 import type { Filters, RoundPayload, GuessResult } from '../types';
 import { hashFiltersSync, TAXON_PRESETS, PLACE_PRESETS } from '../lib/filters';
 import {
@@ -36,6 +36,7 @@ const state = ref<State>('loading');
 const round = ref<RoundPayload | null>(null);
 const prefetchedRound = ref<RoundPayload | null>(null);
 const pendingGuess = ref<{ lat: number; lng: number } | null>(null);
+const mobilePane = ref<'plate' | 'chart'>('plate');
 const result = ref<GuessResult | null>(null);
 const roundIndex = ref(0);
 const streak = ref(0);
@@ -97,6 +98,7 @@ async function loadRound() {
   result.value = null;
   pendingGuess.value = null;
   hintsUsed.value = 0;
+  mobilePane.value = 'plate';
 
   // Fast path: a prefetched round is ready to go.
   if (prefetchedRound.value) {
@@ -158,6 +160,8 @@ async function submitGuess() {
     if (!res.ok) throw new Error('Failed to submit guess');
     const r = (await res.json()) as GuessResult;
     result.value = r;
+    // On mobile, show the chart so the user sees their pin vs the actual.
+    mobilePane.value = 'chart';
     expeditionRounds.value.push({
       distanceKm: r.distanceKm,
       score: r.score,
@@ -303,6 +307,15 @@ onMounted(() => {
   loadRound();
 });
 
+// When the mobile pane toggles to 'chart' from a hidden state, Leaflet needs
+// a resize nudge so its tile grid fills the now-visible container.
+watch(mobilePane, async (pane) => {
+  if (pane === 'chart') {
+    await nextTick();
+    guessMapRef.value?.invalidateSize?.();
+  }
+});
+
 function formatCoord(lat: number, lng: number) {
   const ns = lat >= 0 ? 'N' : 'S';
   const ew = lng >= 0 ? 'E' : 'W';
@@ -313,25 +326,192 @@ function formatCoord(lat: number, lng: number) {
 <template>
   <div class="max-w-6xl mx-auto">
     <!-- HUD -->
-    <div class="mb-6">
+    <div class="mb-2">
       <StreakHud :current="streak" :best="bestStreak" :threshold="threshold" :multiplier="multiplier" />
     </div>
 
-    <!-- Loading -->
-    <div v-if="state === 'loading'" class="text-center py-24">
-      <div class="eyebrow mb-3">Consulting the archive</div>
-      <div class="font-display italic text-3xl">Fetching specimen…</div>
-      <div class="inline-block mt-6">
-        <div class="hairline w-24"></div>
+    <!-- Action bar — sits under the HUD so Submit is always in view -->
+    <div
+      v-if="state !== 'loading' && round"
+      class="action-bar mb-4 border border-ink bg-paper-dark flex flex-wrap items-center justify-between gap-3 px-4 py-2"
+    >
+      <div
+        class="font-serif italic text-ink-soft text-sm min-h-[1.25rem] flex items-center gap-2"
+        :class="{ 'hidden md:flex': state === 'guessing' && !pendingGuess }"
+      >
+        <span class="action-bar__dot" aria-hidden="true"></span>
+        <template v-if="state === 'guessing' && !pendingGuess">
+          Click the chart to place your pin.
+        </template>
+        <template v-else-if="state === 'guessing'">
+          Ready when you are.
+        </template>
+        <template v-else-if="state === 'revealing'">
+          The trail continues…
+        </template>
+        <template v-else-if="state === 'gameover'">
+          The journal closes. Final streak:
+          <span class="font-display not-italic text-ink text-lg ml-1">{{ streak }}</span>.
+        </template>
+      </div>
+
+      <div class="flex flex-wrap gap-2 items-center">
+        <button
+          v-if="state === 'guessing' && !pendingGuess"
+          type="button"
+          class="btn-ink md:hidden"
+          @click="mobilePane = 'chart'"
+        >
+          Place Pin →
+        </button>
+        <button
+          v-if="state === 'guessing'"
+          type="button"
+          class="btn-ghost"
+          :disabled="submitting"
+          @click="loadRound"
+        >
+          ⇢ Skip Specimen
+        </button>
+        <button
+          v-if="state === 'guessing'"
+          type="button"
+          class="btn-ink"
+          :class="{ 'hidden md:inline-flex': !pendingGuess }"
+          :disabled="!pendingGuess || submitting"
+          @click="submitGuess"
+        >
+          {{ submitting ? 'Submitting…' : 'Submit Guess →' }}
+        </button>
+        <button
+          v-if="state === 'revealing'"
+          type="button"
+          class="btn-ink"
+          @click="nextRound"
+        >
+          Next Specimen →
+        </button>
+        <template v-if="state === 'gameover'">
+          <a href="/" class="btn-ghost">← Change Filters</a>
+          <button
+            v-if="!journalSubmitted && streak < 5"
+            type="button"
+            class="btn-ink"
+            @click="showSubmitModal = true"
+          >
+            Submit to Leaderboard
+          </button>
+          <a
+            v-if="journalSubmitted"
+            href="/leaderboard"
+            class="btn-ghost"
+          >
+            View Leaderboard
+          </a>
+          <button type="button" class="btn-ink" @click="playAgain">
+            New Expedition →
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <!-- Loading — developing-plate expedition prep -->
+    <div v-if="state === 'loading'" class="loading-stage relative" aria-busy="true" aria-live="polite">
+      <!-- Skeleton that previews the eventual layout: plate + chart, stats row above -->
+      <div class="grid md:grid-cols-2 gap-6 md:gap-8 loading-stage__grid" aria-hidden="true">
+        <!-- Plate skeleton -->
+        <section>
+          <div class="flex items-baseline gap-3 mb-2">
+            <span class="eyebrow">Plate</span>
+            <span class="font-mono text-[0.68rem] uppercase tracking-widest2 text-ink-soft">№ —</span>
+            <span class="flex-1 h-px bg-ink opacity-30"></span>
+          </div>
+          <div class="plate-frame">
+            <div class="loading-panel loading-panel--photo">
+              <div class="loading-panel__grain"></div>
+              <div class="loading-panel__hatch"></div>
+              <div class="loading-panel__sweep"></div>
+            </div>
+          </div>
+        </section>
+        <!-- Chart skeleton -->
+        <section>
+          <div class="flex items-baseline gap-3 mb-2">
+            <span class="eyebrow">Chart</span>
+            <span class="font-mono text-[0.68rem] uppercase tracking-widest2 text-ink-soft">Plotting coordinates</span>
+            <span class="flex-1 h-px bg-ink opacity-30"></span>
+          </div>
+          <div class="plate-frame">
+            <div class="loading-panel loading-panel--map">
+              <div class="loading-panel__grain"></div>
+              <div class="loading-panel__meridians"></div>
+              <div class="loading-panel__sweep loading-panel__sweep--slow"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Stamped placard centered over the skeleton -->
+      <div class="loading-placard" role="status">
+        <div class="loading-placard__corner loading-placard__corner--tl"></div>
+        <div class="loading-placard__corner loading-placard__corner--tr"></div>
+        <div class="loading-placard__corner loading-placard__corner--bl"></div>
+        <div class="loading-placard__corner loading-placard__corner--br"></div>
+
+        <div class="loading-placard__eyebrow font-mono uppercase tracking-widest2">
+          <span class="loading-placard__dot"></span>
+          Expedition in preparation
+        </div>
+        <div class="loading-placard__title font-display italic">
+          Preparing Field Notes<span class="loading-placard__ellipsis">
+            <span>.</span><span>.</span><span>.</span>
+          </span>
+        </div>
+        <div class="loading-placard__meta font-mono uppercase tracking-widest2">
+          consulting archive · warming plates · unfurling charts
+        </div>
+        <div class="loading-placard__rule"></div>
       </div>
     </div>
 
     <!-- Active round -->
     <template v-else-if="round">
-      <div class="grid md:grid-cols-2 gap-6 md:gap-8">
+      <!-- Mobile pane toggle (Plate | Chart). Desktop shows both side-by-side. -->
+      <div class="md:hidden mb-3 grid grid-cols-2 border border-ink pane-toggle" role="tablist">
+        <button
+          type="button"
+          class="pane-toggle__btn"
+          :class="{ 'pane-toggle__btn--active': mobilePane === 'plate' }"
+          role="tab"
+          :aria-selected="mobilePane === 'plate'"
+          @click="mobilePane = 'plate'"
+        >
+          <span class="eyebrow">Plate</span>
+        </button>
+        <button
+          type="button"
+          class="pane-toggle__btn border-l border-ink"
+          :class="{
+            'pane-toggle__btn--active': mobilePane === 'chart',
+            'pane-toggle__btn--attention': state === 'guessing' && !pendingGuess && mobilePane !== 'chart',
+          }"
+          role="tab"
+          :aria-selected="mobilePane === 'chart'"
+          @click="mobilePane = 'chart'"
+        >
+          <span class="eyebrow">Chart</span>
+          <span
+            v-if="state === 'guessing' && pendingGuess && mobilePane !== 'chart'"
+            class="pane-toggle__badge font-mono"
+            aria-label="Pin placed"
+          >●</span>
+        </button>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6 md:gap-8 play-grid">
         <!-- Left: specimen -->
-        <section>
-          <div class="flex items-baseline gap-3 mb-3">
+        <section :class="{ 'hidden md:block': mobilePane !== 'plate' }">
+          <div class="flex items-baseline gap-3 mb-2">
             <span class="eyebrow">Plate</span>
             <span class="font-mono text-[0.68rem] uppercase tracking-widest2 text-ink-soft">
               № {{ String(roundIndex + 1).padStart(3, '0') }}
@@ -344,7 +524,7 @@ function formatCoord(lat: number, lng: number) {
             :fig-number="roundIndex + 1"
             @zoom="(url) => { lightboxUrl = url; lightboxOpen = true; }"
           />
-          <div v-if="state === 'guessing'" class="mt-4">
+          <div v-if="state === 'guessing'" class="mt-3">
             <HintCategories
               :round-id="round.roundId"
               :hints-used="hintsUsed"
@@ -354,8 +534,8 @@ function formatCoord(lat: number, lng: number) {
         </section>
 
         <!-- Right: map -->
-        <section>
-          <div class="flex items-baseline gap-3 mb-3">
+        <section :class="{ 'hidden md:block': mobilePane !== 'chart' }">
+          <div class="flex items-baseline gap-3 mb-2">
             <span class="eyebrow">Chart</span>
             <span class="font-mono text-[0.68rem] uppercase tracking-widest2 text-ink-soft">
               {{ state === 'guessing' ? 'Mark your hypothesis' : 'Disclosure' }}
@@ -366,6 +546,7 @@ function formatCoord(lat: number, lng: number) {
           <GuessMap
             v-if="state === 'guessing'"
             ref="guessMapRef"
+            :has-guess="!!pendingGuess"
             @guess="onGuess"
           />
           <ResultMap
@@ -386,7 +567,7 @@ function formatCoord(lat: number, lng: number) {
           </div>
 
           <!-- Oracle hint (under the map) -->
-          <div v-if="state === 'guessing'" class="mt-4">
+          <div v-if="state === 'guessing'" class="mt-3">
             <OracleHint :round-id="round.roundId" />
           </div>
         </section>
@@ -494,75 +675,7 @@ function formatCoord(lat: number, lng: number) {
         </div>
       </div>
 
-      <!-- Actions -->
-      <div class="mt-8 flex flex-wrap items-center justify-between gap-4">
-        <div class="font-serif italic text-ink-soft">
-          <template v-if="state === 'guessing' && !pendingGuess">
-            Click the chart to place your pin.
-          </template>
-          <template v-else-if="state === 'guessing'">
-            Ready when you are.
-          </template>
-          <template v-else-if="state === 'revealing'">
-            The trail continues…
-          </template>
-          <template v-else-if="state === 'gameover'">
-            The journal closes. Final streak: <span class="font-display text-xl not-italic">{{ streak }}</span>.
-          </template>
-        </div>
-
-        <div class="flex gap-3">
-          <button
-            v-if="state === 'guessing'"
-            type="button"
-            class="btn-ghost"
-            :disabled="submitting"
-            @click="loadRound"
-          >
-            ⇢ Skip Specimen
-          </button>
-          <button
-            v-if="state === 'guessing'"
-            type="button"
-            class="btn-ink"
-            :disabled="!pendingGuess || submitting"
-            @click="submitGuess"
-          >
-            {{ submitting ? 'Submitting…' : 'Submit Guess →' }}
-          </button>
-          <button
-            v-if="state === 'revealing'"
-            type="button"
-            class="btn-ink"
-            @click="nextRound"
-          >
-            Next Specimen →
-          </button>
-          <template v-if="state === 'gameover'">
-            <a href="/" class="btn-ghost">← Change Filters</a>
-            <button
-              v-if="!journalSubmitted && streak < 5"
-              type="button"
-              class="btn-ink"
-              @click="showSubmitModal = true"
-            >
-              Submit to Leaderboard
-            </button>
-            <a
-              v-if="journalSubmitted"
-              href="/leaderboard"
-              class="btn-ghost"
-            >
-              View Leaderboard
-            </a>
-            <button type="button" class="btn-ink" @click="playAgain">
-              New Expedition →
-            </button>
-          </template>
-        </div>
-      </div>
-
-      <div v-if="errorMsg" class="mt-4 border border-rust text-rust px-4 py-2 font-mono text-xs uppercase tracking-widest2">
+      <div v-if="errorMsg" class="mt-6 border border-rust text-rust px-4 py-2 font-mono text-xs uppercase tracking-widest2">
         ⚠ {{ errorMsg }}
       </div>
 
@@ -599,3 +712,308 @@ function formatCoord(lat: number, lng: number) {
     />
   </div>
 </template>
+
+<style scoped>
+/* ── Sticky action bar, just beneath the stats row ──────────────────── */
+.action-bar {
+  /* subtle woven paper texture reminiscent of the plate-overlay */
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(26, 46, 36, 0.04) 0 1px,
+      transparent 1px 8px
+    );
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.action-bar__dot {
+  display: inline-block;
+  width: 0.4rem;
+  height: 0.4rem;
+  background: var(--rust);
+  border-radius: 50%;
+  opacity: 0.75;
+  animation: action-dot 2000ms ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes action-dot {
+  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+  50%      { opacity: 1;   transform: scale(1.1);  }
+}
+
+/* ── Loading stage: empty plates under a stamped placard ─────────────── */
+.loading-stage {
+  min-height: 60vh;
+}
+
+.loading-stage__grid {
+  opacity: 0.85;
+}
+
+.loading-panel {
+  position: relative;
+  height: 58vh;
+  min-height: 420px;
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    rgba(237, 220, 190, 0.95),
+    rgba(196, 160, 112, 0.9) 50%,
+    rgba(154, 118, 78, 0.92)
+  );
+}
+
+.loading-panel--map {
+  background: linear-gradient(
+    145deg,
+    rgba(230, 217, 184, 0.95),
+    rgba(200, 178, 132, 0.9) 55%,
+    rgba(170, 140, 90, 0.92)
+  );
+}
+
+.loading-panel__grain {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(60, 40, 20, 0.28) 0.7px, transparent 0.8px);
+  background-size: 3px 3px;
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+
+.loading-panel__hatch {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(60, 40, 20, 0.18) 0 1px,
+      transparent 1px 7px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(60, 40, 20, 0.1) 0 1px,
+      transparent 1px 9px
+    );
+  mix-blend-mode: multiply;
+}
+
+/* Map skeleton: faux meridians / parallels instead of hatched engraving */
+.loading-panel__meridians {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      to right,
+      rgba(26, 46, 36, 0.14) 0 1px,
+      transparent 1px 56px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      rgba(26, 46, 36, 0.14) 0 1px,
+      transparent 1px 56px
+    );
+  mix-blend-mode: multiply;
+  mask-image: radial-gradient(ellipse at center, black 45%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 45%, transparent 85%);
+}
+
+.loading-panel__sweep {
+  position: absolute;
+  inset: -20% -40%;
+  background: linear-gradient(
+    100deg,
+    transparent 42%,
+    rgba(255, 245, 220, 0.35) 50%,
+    transparent 58%
+  );
+  animation: loading-sweep 2600ms ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
+.loading-panel__sweep--slow {
+  animation-duration: 3400ms;
+  animation-delay: 600ms;
+}
+
+@keyframes loading-sweep {
+  0%   { transform: translateX(-40%); }
+  100% { transform: translateX(40%);  }
+}
+
+/* Stamped placard — the loud, letterpressed "preparing…" sign */
+.loading-placard {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: min(520px, 86%);
+  padding: 1.75rem 2rem 1.5rem;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  box-shadow:
+    4px 4px 0 var(--ink),
+    inset 0 0 0 1px var(--paper),
+    inset 0 0 0 2px var(--ink);
+  text-align: center;
+  animation: placard-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  z-index: 2;
+}
+
+/* Hatched wash behind the placard text — ties it to the photo reveal */
+.loading-placard::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(26, 46, 36, 0.06) 0 1px,
+      transparent 1px 6px
+    );
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+/* Engraver's corner brackets */
+.loading-placard__corner {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: var(--ink);
+  border-style: solid;
+  border-width: 0;
+}
+.loading-placard__corner--tl { top: 6px; left: 6px; border-top-width: 1.5px; border-left-width: 1.5px; }
+.loading-placard__corner--tr { top: 6px; right: 6px; border-top-width: 1.5px; border-right-width: 1.5px; }
+.loading-placard__corner--bl { bottom: 6px; left: 6px; border-bottom-width: 1.5px; border-left-width: 1.5px; }
+.loading-placard__corner--br { bottom: 6px; right: 6px; border-bottom-width: 1.5px; border-right-width: 1.5px; }
+
+.loading-placard__eyebrow {
+  position: relative;
+  font-size: 0.62rem;
+  color: var(--ink-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+
+.loading-placard__dot {
+  display: inline-block;
+  width: 0.42rem;
+  height: 0.42rem;
+  background: var(--rust);
+  border-radius: 50%;
+  animation: placard-pulse 1400ms ease-in-out infinite;
+}
+
+@keyframes placard-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50%      { opacity: 1;    transform: scale(1.15); }
+}
+
+.loading-placard__title {
+  position: relative;
+  font-size: clamp(1.75rem, 3.2vw, 2.5rem);
+  line-height: 1.1;
+  font-variation-settings: 'opsz' 144;
+  margin: 0.1rem 0 0.75rem;
+}
+
+.loading-placard__ellipsis {
+  display: inline-block;
+  margin-left: 0.1em;
+}
+
+.loading-placard__ellipsis span {
+  display: inline-block;
+  animation: placard-ellipsis 1400ms ease-in-out infinite;
+}
+.loading-placard__ellipsis span:nth-child(2) { animation-delay: 180ms; }
+.loading-placard__ellipsis span:nth-child(3) { animation-delay: 360ms; }
+
+@keyframes placard-ellipsis {
+  0%, 100% { opacity: 0.2; }
+  50%      { opacity: 1;   }
+}
+
+.loading-placard__meta {
+  position: relative;
+  font-size: 0.6rem;
+  color: var(--ink-soft);
+  letter-spacing: 0.24em;
+}
+
+.loading-placard__rule {
+  position: relative;
+  height: 1px;
+  width: 48px;
+  margin: 0.85rem auto 0;
+  background: var(--ink);
+  opacity: 0.55;
+}
+
+@keyframes placard-in {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 10px)); }
+  to   { opacity: 1; transform: translate(-50%, -50%);              }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-panel__sweep,
+  .loading-placard__dot,
+  .loading-placard__ellipsis span,
+  .action-bar__dot {
+    animation: none;
+  }
+  .loading-placard {
+    animation-duration: 200ms;
+  }
+}
+
+/* Mobile Plate/Chart segmented toggle */
+.pane-toggle {
+  background: rgb(var(--paper-dark-rgb, 244 232 206) / 0.35);
+}
+.pane-toggle__btn {
+  position: relative;
+  padding: 0.55rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: background 150ms ease, color 150ms ease;
+}
+.pane-toggle__btn--active {
+  background: theme('colors.ink');
+  color: theme('colors.paper');
+}
+.pane-toggle__btn--active .eyebrow {
+  color: inherit;
+}
+.pane-toggle__btn--attention::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px dashed theme('colors.rust');
+  pointer-events: none;
+  animation: pane-attention 1400ms ease-in-out infinite;
+}
+@keyframes pane-attention {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.9; }
+}
+.pane-toggle__badge {
+  color: theme('colors.rust');
+  font-size: 0.6rem;
+  line-height: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pane-toggle__btn--attention::after {
+    animation: none;
+  }
+}
+</style>

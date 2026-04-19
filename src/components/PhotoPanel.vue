@@ -65,14 +65,14 @@ function selectThumb(i: number) {
 </script>
 
 <template>
-  <figure class="space-y-3">
+  <figure class="space-y-2">
     <div class="plate-frame relative overflow-hidden">
       <img
         v-if="currentUrl"
         :key="currentUrl"
         :src="currentUrl"
         alt="Specimen photograph"
-        class="plate-image w-full max-h-[58vh] object-cover block cursor-zoom-in"
+        class="plate-image w-full object-cover block cursor-zoom-in"
         :class="{ 'plate-image--ready': isLoaded }"
         loading="eager"
         decoding="async"
@@ -170,6 +170,17 @@ function selectThumb(i: number) {
     transform 900ms cubic-bezier(0.22, 1, 0.36, 1),
     filter 900ms ease-out;
   will-change: opacity, transform, filter;
+  max-height: min(60vh, 540px);
+  min-height: 260px;
+}
+@media (min-width: 768px) {
+  /* Cap subtracts room for header + HUD + action bar + section title +
+     figcaption + HintCategories + gaps so the full plate+chart grid fits
+     inside one viewport on typical laptop displays (≥ 720 tall). */
+  .plate-image {
+    max-height: min(calc(100vh - 460px), 500px);
+    min-height: 220px;
+  }
 }
 
 .plate-image--ready {
