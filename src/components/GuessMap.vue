@@ -49,19 +49,8 @@ defineExpose({ reset, invalidateSize });
 
 <template>
   <div class="relative">
-    <div class="plate-frame">
+    <div class="plate-frame plate-frame--map">
       <div ref="mapEl" class="guess-map__canvas w-full"></div>
-    </div>
-
-    <!-- Floating center crosshair — quiet beacon, fades when a pin is dropped -->
-    <div
-      v-if="!hasGuess"
-      class="pin-beacon"
-      aria-hidden="true"
-    >
-      <span class="pin-beacon__ring"></span>
-      <span class="pin-beacon__ring pin-beacon__ring--late"></span>
-      <span class="pin-beacon__cross"></span>
     </div>
 
     <!-- Stamped callout — inky, letterpress, drop-shadow like a field-guide stamp -->
@@ -102,61 +91,6 @@ defineExpose({ reset, invalidateSize });
     height: min(calc(100vh - 460px), 500px);
     min-height: 220px;
   }
-}
-
-/* Centered pulsing beacon ring + crosshair over the map */
-.pin-beacon {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 64px;
-  height: 64px;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  z-index: 5;
-  animation: beacon-fade 500ms ease-out both;
-}
-
-.pin-beacon__ring {
-  position: absolute;
-  inset: 0;
-  border: 1.5px solid rgba(155, 61, 30, 0.85); /* rust */
-  border-radius: 50%;
-  animation: beacon-ring 2200ms ease-out infinite;
-  opacity: 0;
-}
-
-.pin-beacon__ring--late {
-  animation-delay: 1100ms;
-}
-
-.pin-beacon__cross {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 14px;
-  height: 14px;
-  transform: translate(-50%, -50%);
-  background:
-    linear-gradient(to right, transparent 45%, rgba(26, 46, 36, 0.85) 45% 55%, transparent 55%),
-    linear-gradient(to bottom, transparent 45%, rgba(26, 46, 36, 0.85) 45% 55%, transparent 55%);
-  animation: beacon-cross 1600ms ease-in-out infinite;
-}
-
-@keyframes beacon-ring {
-  0%   { opacity: 0;    transform: scale(0.3); }
-  25%  { opacity: 0.9;  }
-  100% { opacity: 0;    transform: scale(1.8); }
-}
-
-@keyframes beacon-cross {
-  0%, 100% { opacity: 0.55; }
-  50%      { opacity: 1;    }
-}
-
-@keyframes beacon-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
 }
 
 /* Stamped instruction card — letterpress / field-guide stamp feel */
@@ -259,8 +193,6 @@ defineExpose({ reset, invalidateSize });
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pin-beacon__ring,
-  .pin-beacon__cross,
   .pin-stamp__dot {
     animation: none;
   }
