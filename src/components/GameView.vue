@@ -34,6 +34,7 @@ const props = defineProps<{ filters: Filters }>();
 
 const state = ref<State>('loading');
 const round = ref<RoundPayload | null>(null);
+const prefetchedRound = ref<RoundPayload | null>(null);
 const pendingGuess = ref<{ lat: number; lng: number } | null>(null);
 const result = ref<GuessResult | null>(null);
 const roundIndex = ref(0);
@@ -74,25 +75,64 @@ const totalScore = computed(() =>
 
 const guessMapRef = useTemplateRef<InstanceType<typeof GuessMap>>('guessMapRef');
 
+function roundUrl(): string {
+  const params = new URLSearchParams();
+  if (props.filters.taxonIds?.length) params.set('taxa', props.filters.taxonIds.join(','));
+  if (props.filters.placeIds?.length) params.set('places', props.filters.placeIds.join(','));
+  const qs = params.toString();
+  return '/api/round' + (qs ? '?' + qs : '');
+}
+
+function warmImageCache(urls: string[]) {
+  if (typeof window === 'undefined') return;
+  for (const u of urls) {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = u;
+  }
+}
+
 async function loadRound() {
-  state.value = 'loading';
   errorMsg.value = null;
   result.value = null;
   pendingGuess.value = null;
   hintsUsed.value = 0;
+
+  // Fast path: a prefetched round is ready to go.
+  if (prefetchedRound.value) {
+    round.value = prefetchedRound.value;
+    prefetchedRound.value = null;
+    state.value = 'guessing';
+    guessMapRef.value?.reset?.();
+    warmImageCache(round.value.photoUrls);
+    return;
+  }
+
+  state.value = 'loading';
   try {
-    const params = new URLSearchParams();
-    if (props.filters.taxonIds?.length) params.set('taxa', props.filters.taxonIds.join(','));
-    if (props.filters.placeIds?.length) params.set('places', props.filters.placeIds.join(','));
-    const qs = params.toString();
-    const res = await fetch('/api/round' + (qs ? '?' + qs : ''));
+    const res = await fetch(roundUrl());
     if (!res.ok) throw new Error('Failed to load observation');
     round.value = (await res.json()) as RoundPayload;
     state.value = 'guessing';
     guessMapRef.value?.reset?.();
+    warmImageCache(round.value.photoUrls);
   } catch (e: any) {
     errorMsg.value = e?.message ?? 'Failed to load observation';
     state.value = 'guessing';
+  }
+}
+
+async function prefetchNextRound() {
+  // Don't stampede: skip if we already have one queued.
+  if (prefetchedRound.value) return;
+  try {
+    const res = await fetch(roundUrl());
+    if (!res.ok) return;
+    const next = (await res.json()) as RoundPayload;
+    prefetchedRound.value = next;
+    warmImageCache(next.photoUrls);
+  } catch {
+    // Silent — prefetch is best-effort.
   }
 }
 
@@ -132,6 +172,9 @@ async function submitGuess() {
         setBestStreak(filterHash.value, bestStreak.value);
       }
       state.value = 'revealing';
+      // Quietly queue up the next specimen + warm its photo cache while
+      // the user reads the field-notes card.
+      prefetchNextRound();
     } else {
       if (streak.value > bestStreak.value) bestStreak.value = streak.value;
       setBestStreak(filterHash.value, bestStreak.value);
@@ -251,6 +294,7 @@ function playAgain() {
   submittedRank.value = null;
   showSubmitModal.value = false;
   autoSubmitName.value = null;
+  prefetchedRound.value = null;
   loadRound();
 }
 

@@ -11,18 +11,21 @@ defineEmits<{ (e: 'zoom', url: string): void }>();
 
 const currentIndex = ref(0);
 const failedUrls = ref<Set<string>>(new Set());
+const loadedUrls = ref<Set<string>>(new Set());
 
 watch(
   () => props.photoUrls,
   () => {
     currentIndex.value = 0;
     failedUrls.value = new Set();
+    loadedUrls.value = new Set();
   }
 );
 
 const visibleUrls = computed(() => props.photoUrls.filter((u) => !failedUrls.value.has(u)));
 const currentUrl = computed(() => visibleUrls.value[currentIndex.value] ?? visibleUrls.value[0] ?? '');
 const hasMultiple = computed(() => visibleUrls.value.length > 1);
+const isLoaded = computed(() => !!currentUrl.value && loadedUrls.value.has(currentUrl.value));
 
 function prev() {
   const n = visibleUrls.value.length;
@@ -45,6 +48,14 @@ function onError() {
     currentIndex.value = 0;
   }
 }
+function onLoad() {
+  const url = currentUrl.value;
+  if (!url) return;
+  // Trigger reveal on the next frame so the transition fires reliably
+  requestAnimationFrame(() => {
+    loadedUrls.value = new Set([...loadedUrls.value, url]);
+  });
+}
 function selectThumb(i: number) {
   const url = props.photoUrls[i];
   if (!url || failedUrls.value.has(url)) return;
@@ -55,36 +66,60 @@ function selectThumb(i: number) {
 
 <template>
   <figure class="space-y-3">
-    <div class="plate-frame relative">
+    <div class="plate-frame relative overflow-hidden">
       <img
         v-if="currentUrl"
+        :key="currentUrl"
         :src="currentUrl"
         alt="Specimen photograph"
-        class="w-full max-h-[58vh] object-cover block cursor-zoom-in"
+        class="plate-image w-full max-h-[58vh] object-cover block cursor-zoom-in"
+        :class="{ 'plate-image--ready': isLoaded }"
         loading="eager"
+        decoding="async"
         @click="$emit('zoom', currentUrl)"
+        @load="onLoad"
         @error="onError"
       />
       <div v-else class="w-full h-64 flex items-center justify-center font-serif italic text-ink-soft">
         Specimen photograph unavailable.
       </div>
+
+      <!-- Developing-plate reveal overlay -->
+      <div
+        v-if="currentUrl"
+        class="plate-overlay"
+        :class="{ 'plate-overlay--gone': isLoaded }"
+        aria-hidden="true"
+      >
+        <div class="plate-overlay__grain"></div>
+        <div class="plate-overlay__hatch"></div>
+        <div class="plate-overlay__sweep"></div>
+        <div class="plate-overlay__label font-mono uppercase tracking-widest2">
+          <span class="plate-overlay__dot"></span>
+          exposing plate
+          <span class="plate-overlay__ellipsis">
+            <span>.</span><span>.</span><span>.</span>
+          </span>
+        </div>
+      </div>
+
       <button
         v-if="hasMultiple"
         type="button"
-        class="absolute left-3 top-1/2 -translate-y-1/2 bg-paper border border-ink w-9 h-9 flex items-center justify-center font-display text-xl hover:bg-ink hover:text-paper transition"
+        class="absolute left-3 top-1/2 -translate-y-1/2 bg-paper border border-ink w-9 h-9 flex items-center justify-center font-display text-xl hover:bg-ink hover:text-paper transition z-10"
         aria-label="Previous photograph"
         @click.stop="prev"
       >◀</button>
       <button
         v-if="hasMultiple"
         type="button"
-        class="absolute right-3 top-1/2 -translate-y-1/2 bg-paper border border-ink w-9 h-9 flex items-center justify-center font-display text-xl hover:bg-ink hover:text-paper transition"
+        class="absolute right-3 top-1/2 -translate-y-1/2 bg-paper border border-ink w-9 h-9 flex items-center justify-center font-display text-xl hover:bg-ink hover:text-paper transition z-10"
         aria-label="Next photograph"
         @click.stop="next"
       >▶</button>
       <div
         v-if="hasMultiple"
-        class="absolute top-3 right-3 bg-paper border border-ink px-2 py-0.5 font-mono text-[0.62rem] uppercase tracking-widest2 pointer-events-none"
+        class="absolute top-3 right-3 bg-paper border border-ink px-2 py-0.5 font-mono text-[0.62rem] uppercase tracking-widest2 pointer-events-none z-10"
       >
         Pl. {{ currentIndex + 1 }} / {{ visibleUrls.length }}
       </div>
@@ -124,3 +159,145 @@ function selectThumb(i: number) {
     </figcaption>
   </figure>
 </template>
+
+<style scoped>
+.plate-image {
+  opacity: 0;
+  transform: scale(1.02);
+  filter: blur(8px) saturate(0.4) sepia(0.3);
+  transition:
+    opacity 700ms ease-out,
+    transform 900ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 900ms ease-out;
+  will-change: opacity, transform, filter;
+}
+
+.plate-image--ready {
+  opacity: 1;
+  transform: scale(1);
+  filter: blur(0) saturate(1) sepia(0);
+}
+
+.plate-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition:
+    opacity 700ms ease-in,
+    transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+  background: linear-gradient(
+    135deg,
+    rgba(237, 220, 190, 0.95),
+    rgba(196, 160, 112, 0.9) 50%,
+    rgba(154, 118, 78, 0.92)
+  );
+  will-change: opacity, transform;
+  overflow: hidden;
+}
+
+.plate-overlay--gone {
+  opacity: 0;
+  transform: scale(1.06);
+}
+
+/* Film-grain layer */
+.plate-overlay__grain {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(60, 40, 20, 0.28) 0.7px, transparent 0.8px);
+  background-size: 3px 3px;
+  mix-blend-mode: multiply;
+  opacity: 0.6;
+}
+
+/* Diagonal cross-hatch (naturalist-plate engraving feel) */
+.plate-overlay__hatch {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(60, 40, 20, 0.18) 0 1px,
+      transparent 1px 7px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(60, 40, 20, 0.1) 0 1px,
+      transparent 1px 9px
+    );
+  mix-blend-mode: multiply;
+}
+
+/* Slow diagonal sweep — light passing over the developing plate */
+.plate-overlay__sweep {
+  position: absolute;
+  inset: -20% -40%;
+  background: linear-gradient(
+    100deg,
+    transparent 42%,
+    rgba(255, 245, 220, 0.35) 50%,
+    transparent 58%
+  );
+  animation: plate-sweep 2600ms ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
+@keyframes plate-sweep {
+  0% { transform: translateX(-40%); }
+  100% { transform: translateX(40%); }
+}
+
+.plate-overlay__label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.62rem;
+  color: rgba(46, 30, 12, 0.8);
+  letter-spacing: 0.18em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  background: rgba(245, 232, 205, 0.7);
+  border: 1px solid rgba(46, 30, 12, 0.4);
+}
+
+.plate-overlay__dot {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  background: rgba(180, 50, 30, 0.85);
+  border-radius: 50%;
+  animation: plate-pulse 1400ms ease-in-out infinite;
+}
+
+@keyframes plate-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.9); }
+  50%      { opacity: 1;    transform: scale(1.1); }
+}
+
+.plate-overlay__ellipsis span {
+  display: inline-block;
+  animation: plate-ellipsis 1400ms ease-in-out infinite;
+}
+.plate-overlay__ellipsis span:nth-child(2) { animation-delay: 180ms; }
+.plate-overlay__ellipsis span:nth-child(3) { animation-delay: 360ms; }
+
+@keyframes plate-ellipsis {
+  0%, 100% { opacity: 0.2; }
+  50%      { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plate-image,
+  .plate-overlay {
+    transition-duration: 200ms;
+  }
+  .plate-overlay__sweep,
+  .plate-overlay__dot,
+  .plate-overlay__ellipsis span {
+    animation: none;
+  }
+}
+</style>
