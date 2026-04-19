@@ -47,12 +47,24 @@ export const TAXON_PRESETS: { label: string; taxonIds?: number[] }[] = [
   { label: 'Fungi', taxonIds: [47170] },
 ];
 
-export const PLACE_PRESETS: { label: string; placeIds?: number[] }[] = [
+export type ContinentCode = 'NA' | 'SA' | 'EU' | 'AF' | 'AS' | 'OC';
+
+export const PLACE_PRESETS: { label: string; placeIds?: number[]; continent?: ContinentCode }[] = [
   { label: 'World' },
-  { label: 'North America', placeIds: [97394] },
-  { label: 'South America', placeIds: [97389] },
-  { label: 'Europe', placeIds: [97391] },
-  { label: 'Africa', placeIds: [97392] },
-  { label: 'Asia', placeIds: [97395] },
-  { label: 'Oceania', placeIds: [97393] },
+  { label: 'North America', placeIds: [97394], continent: 'NA' },
+  { label: 'South America', placeIds: [97389], continent: 'SA' },
+  { label: 'Europe',        placeIds: [97391], continent: 'EU' },
+  { label: 'Africa',        placeIds: [97392], continent: 'AF' },
+  { label: 'Asia',          placeIds: [97395], continent: 'AS' },
+  { label: 'Oceania',       placeIds: [97393], continent: 'OC' },
 ];
+
+const PLACE_ID_TO_CONTINENT = new Map<number, ContinentCode>(
+  PLACE_PRESETS.flatMap((p) =>
+    p.continent && p.placeIds ? p.placeIds.map((id) => [id, p.continent!] as const) : [],
+  ),
+);
+
+export function placeIdToContinent(placeId: number): ContinentCode | undefined {
+  return PLACE_ID_TO_CONTINENT.get(placeId);
+}
