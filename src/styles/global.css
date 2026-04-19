@@ -50,12 +50,19 @@ a { color: inherit; }
 /* Double border frame — specimen plate */
 .plate-frame {
   padding: 10px;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--ink);
+  box-shadow: inset 0 0 0 1px var(--paper), inset 0 0 0 2px var(--ink);
+  background: var(--paper-dark);
+}
+
+/* Stronger frame variant — draws the eye to the map as the primary
+   interactive surface (used on the guess map). */
+.plate-frame--map {
+  border-width: 2px;
   box-shadow:
     inset 0 0 0 1px var(--paper),
     inset 0 0 0 3px var(--ink),
     3px 3px 0 var(--ink);
-  background: var(--paper-dark);
 }
 
 /* Sharp editorial button */
