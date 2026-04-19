@@ -1,6 +1,7 @@
 ---
 // src/pages/leaderboard.astro
 import LeaderboardView from '../components/LeaderboardView.vue';
+import LeaderboardAuthCard from '../components/LeaderboardAuthCard.vue';
 import '../styles/global.css';
 
 const url = new URL(Astro.request.url);
@@ -42,6 +43,7 @@ const error = url.searchParams.get('error');
           {error === 'verification-failed' && 'Verification failed. Please try again.'}
         </div>
       )}
+      <LeaderboardAuthCard client:only="vue" />
       <LeaderboardView client:only="vue" />
     </main>
   </body>
