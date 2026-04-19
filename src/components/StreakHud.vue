@@ -5,13 +5,14 @@ withDefaults(
     best: number;
     threshold: number;
     multiplier?: number;
+    total?: number;
   }>(),
-  { multiplier: 1 }
+  { multiplier: 1, total: 0 }
 );
 </script>
 
 <template>
-  <div class="grid grid-cols-2 md:grid-cols-4 border border-ink">
+  <div class="grid grid-cols-2 md:grid-cols-5 border border-ink">
     <div class="px-3 py-2 border-r border-ink border-b md:border-b-0 flex flex-col items-start">
       <div class="eyebrow text-[0.6rem]">Streak</div>
       <div class="font-display text-2xl md:text-3xl leading-none mt-1" style="font-variation-settings: 'opsz' 144;">
@@ -22,6 +23,12 @@ withDefaults(
       <div class="eyebrow text-[0.6rem]">Personal Best</div>
       <div class="font-display text-2xl md:text-3xl leading-none mt-1 italic" style="font-variation-settings: 'opsz' 144;">
         {{ best }}
+      </div>
+    </div>
+    <div class="px-3 py-2 border-r border-ink border-b md:border-b-0 flex flex-col items-start">
+      <div class="eyebrow text-[0.6rem]">Total</div>
+      <div class="font-mono text-base md:text-lg font-medium leading-none mt-1.5 text-ink">
+        {{ total.toLocaleString() }}
       </div>
     </div>
     <div class="px-3 py-2 border-r border-ink flex flex-col items-start">
